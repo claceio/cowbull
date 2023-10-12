@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"cowbull.co/game/api"
@@ -21,7 +20,7 @@ func (g *GameHandler) NewRouter(static_dir string) *mux.Router {
 	r.Methods("POST").Path("/api/game/{game_id}/hint").HandlerFunc(g.hint)
 	r.Methods("POST").Path("/api/game/{game_id}/resign").HandlerFunc(g.resign)
 	r.Methods("GET").Path("/api/game/{game_id}").HandlerFunc(g.getGame)
-	r.Methods("GET").Path("/api/game/{game_id}/clues").HandlerFunc(g.getCluesHtml)
+	r.Methods("GET").Path("/api/game/{game_id}/clues").HandlerFunc(g.getClues)
 
 	r.Methods("POST").Path("/api/create_challenge/{level}").HandlerFunc(g.createChallenge)
 	r.Methods("GET").Path("/api/challenge/{challenge_id}").HandlerFunc(g.getChallenge)
@@ -61,7 +60,7 @@ func (g *GameHandler) getGame(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error(), "GameInfo": ""})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error(), "GameInfo": ""})
 		return
 	}
 
@@ -75,7 +74,7 @@ func (g *GameHandler) createChallenge(w http.ResponseWriter, r *http.Request) {
 	ret, err := g.api.CreateChallenge(getUserIP(r), vars["level"])
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -89,7 +88,7 @@ func (g *GameHandler) getChallenge(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 
@@ -102,7 +101,7 @@ func (g *GameHandler) getChallengeGames(w http.ResponseWriter, r *http.Request) 
 	games, err := g.api.GetChallengeGames(vars["challenge_id"])
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "%s", err)
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 
@@ -117,7 +116,7 @@ func (g *GameHandler) startChallengeGame(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 
@@ -125,12 +124,12 @@ func (g *GameHandler) startChallengeGame(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(ret)
 }
 
-func (g *GameHandler) getCluesHtml(w http.ResponseWriter, r *http.Request) {
+func (g *GameHandler) getClues(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	ret, err := g.api.GetGame(vars["game_id"])
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, "%s", err)
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 
@@ -144,7 +143,7 @@ func (g *GameHandler) submit(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -157,7 +156,7 @@ func (g *GameHandler) hint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -170,7 +169,7 @@ func (g *GameHandler) resign(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -182,7 +181,7 @@ func (g *GameHandler) getStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"Status": err.Error()})
+		json.NewEncoder(w).Encode(map[string]string{"Error": err.Error()})
 		return
 	}
 

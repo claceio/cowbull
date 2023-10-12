@@ -135,7 +135,7 @@ func (db *GameDB) GetChallenge(challengeId string) (*Challenge, error) {
 	return &Challenge{startedBy, word, createTime}, nil
 }
 
-func (db *GameDB) GetChallengeGames(challengeId string) ([]GameStatus, error) {
+func (db *GameDB) GetChallengeGames(challengeId string) ([]string, error) {
 	challengeId = strings.ToUpper(challengeId)
 	stmt, err := db.db.Prepare(`select game_id from games where challenge_id = ? order by create_time asc`)
 	checkErr(err)
@@ -144,18 +144,14 @@ func (db *GameDB) GetChallengeGames(challengeId string) ([]GameStatus, error) {
 		return nil, errors.New("Invalid challenge id")
 	}
 	defer rows.Close()
-	games := make([]GameStatus, 0)
+	games := make([]string, 0)
 	var gameId string
 	for rows.Next() {
 		err := rows.Scan(&gameId)
 		if err != nil {
 			return nil, err
 		}
-		game, err := db.CheckGameId(gameId)
-		if err != nil {
-			return nil, err
-		}
-		games = append(games, *game)
+		games = append(games, gameId)
 	}
 
 	return games, err
