@@ -120,25 +120,30 @@ func (g *GameAPI) GetChallenge(challengeId string) (map[string]interface{}, erro
 		return nil, err
 	}
 
-	return map[string]interface{}{"Status": ""}, nil
+	// Don't return the word!!
+	return map[string]interface{}{"Status": "", "Challenge_Id": challengeId}, nil
 }
 
-func (g *GameAPI) GetChallengeGames(challengeId string) ([]gamedb.GameStatus, error) {
+func (g *GameAPI) GetChallengeGames(challengeId string) ([]map[string]interface{}, error) {
 	challengeId = strings.ToUpper(challengeId)
 	games, err := g.db.GetChallengeGames(challengeId)
 	if err != nil {
 		return nil, err
 	}
 
-	for i := 0; i < len(games); i++ {
-		game := &games[i]
-		clues, _ := g.db.GetClues(game.GameId)
-		statusText, _, score := getStatusText(*game, clues, true, true)
-		game.Stats = statusText
-		game.Score = score
+	chGames := make([]map[string]interface{}, 0, len(games))
+	for _, game := range games {
+		gameStatus, err := g.GetGame(game)
+		if err != nil {
+			return nil, err
+		}
+		delete(gameStatus, "Clues")
+		delete(gameStatus, "GameId")
+		delete(gameStatus, "Word")
+		chGames = append(chGames, gameStatus)
 	}
 
-	return games, err
+	return chGames, err
 }
 
 func (g *GameAPI) getLocation(ipAddr string) string {
@@ -160,7 +165,7 @@ func (g *GameAPI) getLocation(ipAddr string) string {
 			}
 			if record.Country.Names["en"] != "N/A" {
 				if len(location) != 0 {
-					location += "<br>"
+					location += " "
 				}
 				location += record.Country.Names["en"]
 			}
@@ -211,7 +216,7 @@ func (g *GameAPI) StartGame(ipAddr string, level string) map[string]string {
 
 func (g *GameAPI) GetGame(gameId string) (map[string]interface{}, error) {
 	gameId = strings.ToUpper(gameId)
-	gameStatus, err := g.db.CheckGameId(gameId)
+	gs, err := g.db.CheckGameId(gameId)
 	if err != nil {
 		return nil, err
 	}
@@ -221,10 +226,33 @@ func (g *GameAPI) GetGame(gameId string) (map[string]interface{}, error) {
 		return nil, err
 	}
 
-	statusText, shareText, _ := getStatusText(*gameStatus, gameClues, false, false)
-	infoText := getInfoText(*gameStatus)
-	return map[string]interface{}{"Status": statusText,
-		"ShareText": shareText, "Clues": gameClues, "GameId": gameId, "GameInfo": infoText}, nil
+	var hints int
+	guesses := len(gameClues)
+	for _, c := range gameClues {
+		if c.Hint {
+			hints++
+		}
+	}
+	guesses -= hints
+	location := g.getLocation(gs.Location)
+
+	ret := map[string]interface{}{"Status": gs.Status,
+		"Clues": gameClues, "GameId": gameId, "Location": location,
+		"ChallengeId": gs.ChallengeId, "Time": gs.Duration.String, "GuessCount": guesses, "HintCount": hints}
+
+	ret["Word"] = ""
+	if gs.ChallengeId == "" && (gs.Status == "COMPLETED" || gs.Status == "RESIGNED") {
+		ret["Word"] = gs.Word
+	}
+
+	ret["Score"] = ""
+	if gs.Status == "COMPLETED" {
+		score := computeScore(guesses, hints, gs.CompletedSeconds)
+		scoreS := fmt.Sprintf("%0.2f", score)
+		ret["Score"] = scoreS
+	}
+
+	return ret, nil
 }
 
 func (g *GameAPI) Submit(gameId string, clue string) (map[string]interface{}, error) {
