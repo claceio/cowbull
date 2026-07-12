@@ -1,66 +1,72 @@
+// Command cowbull runs the CowBull game API server.
 package main
 
 import (
 	"context"
 	"flag"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"time"
 
+	game "cowbull.co/game"
 	gameapi "cowbull.co/game/api"
 	gamedb "cowbull.co/game/db"
 )
 
-const (
-	RequestWait = 30 * time.Second
-)
+const shutdownWait = 10 * time.Second
 
-var dbFile = flag.String("f", "./db.sqlite", "database file")
-var port = flag.Int("p", 9999, "port number")
-var enableUpgrade = flag.Bool("u", true, "enable database upgrade")
-var staticDir = flag.String("s", "./static", "the directory to serve files from")
-var dictFile = flag.String("w", "./words.txt", "the word dictionary file")
-var ipLookupFile = flag.String("l", "./GeoLite2-City.mmdb", "the GeoLite IP lookup file")
+var (
+	dbFile        = flag.String("f", "./db.sqlite", "database file")
+	port          = flag.Int("p", 9999, "port number")
+	host          = flag.String("b", "0.0.0.0", "bind address")
+	enableUpgrade = flag.Bool("u", true, "enable database upgrade")
+	ipLookupFile  = flag.String("l", "./GeoLite2-City.mmdb", "the GeoLite IP lookup file")
+)
 
 func main() {
 	flag.Parse()
 	db := gamedb.NewDB(*dbFile)
 	if ok := db.VersionUpgrade(*enableUpgrade); !ok {
-		panic("Invalid db version and upgrade disabled")
+		log.Fatal("invalid db version and upgrade disabled")
 	}
 
-	api := gameapi.NewGameAPI(db, *dictFile, *ipLookupFile)
-	game := &GameHandler{api}
+	api := gameapi.NewGameAPI(db, game.WordFS, *ipLookupFile)
+	apiHandler := NewAPIHandler(api)
+
+	// Request contexts derive from appCtx; cancelling it on shutdown ends
+	// the long-lived SSE streams so Shutdown does not hang on them
+	appCtx, cancelRequests := context.WithCancel(context.Background())
 	srv := http.Server{
-		Addr:         "127.0.0.1:" + strconv.FormatInt(int64(*port), 10),
-		WriteTimeout: 60 * time.Second,
-		ReadTimeout:  60 * time.Second,
-		IdleTimeout:  30 * time.Second,
-		Handler:      game.NewRouter(*staticDir),
+		Addr: *host + ":" + strconv.Itoa(*port),
+		// No WriteTimeout: SSE connections are long-lived
+		ReadTimeout: 60 * time.Second,
+		IdleTimeout: 120 * time.Second,
+		Handler:     apiHandler.Router(),
+		BaseContext: func(net.Listener) context.Context { return appCtx },
 	}
 
 	go api.CleanupDB()
 	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Println(err)
+		log.Printf("CowBull listening on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
 		}
 	}()
 
-	c := make(chan os.Signal, 1)
-	// We'll accept graceful shutdowns when quit via SIGINT (Ctrl+C)
-	signal.Notify(c, os.Interrupt)
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt)
+	<-sig
 
-	// Block until we receive our signal.
-	<-c
-
-	// Create a deadline to wait for.
-	ctx, cancel := context.WithTimeout(context.Background(), RequestWait)
-	defer cancel()
 	log.Println("Shutting down")
-	srv.Shutdown(ctx)
-	game.Shutdown()
-	os.Exit(0)
+	cancelRequests()
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownWait)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("shutdown: %s", err)
+	}
+	api.Close()
 }

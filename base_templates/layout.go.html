@@ -1,0 +1,650 @@
+{{/* Shared layout pieces for all CowBull pages. Defines used across page
+  templates must live here (page-local defines are not visible to other
+  pages).
+*/}}
+
+{{ define "head" }}
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>CowBull: Word game</title>
+    <meta name="description" content="Play the Bulls and Cows word game" />
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href="{{ static "images/cowbull.svg" }}" />
+    <link rel="apple-touch-icon" href="{{ static "images/cowbull.png" }}" />
+    <script>
+      // Apply the saved theme before styles load to avoid a flash; the
+      // generated styles otherwise follow the system preference
+      (function () {
+        var t = localStorage.getItem("cb_theme");
+        if (t === "light") {
+          document.documentElement.setAttribute("data-theme", "cowbull");
+        } else if (t === "dark") {
+          document.documentElement.setAttribute("data-theme", "cowbull-dark");
+        }
+      })();
+      function cbToggleTheme() {
+        var el = document.documentElement;
+        var sysDark = matchMedia("(prefers-color-scheme: dark)").matches;
+        var cur =
+          el.getAttribute("data-theme") ||
+          (sysDark ? "cowbull-dark" : "cowbull");
+        var next = cur === "cowbull-dark" ? "cowbull" : "cowbull-dark";
+        el.setAttribute("data-theme", next);
+        localStorage.setItem(
+          "cb_theme",
+          next === "cowbull-dark" ? "dark" : "light"
+        );
+      }
+      // Replace the native hx-confirm popup with the styled dialog
+      document.addEventListener("htmx:confirm", function (evt) {
+        if (!evt.detail.question) return;
+        evt.preventDefault();
+        var dlg = document.getElementById("confirm_modal");
+        dlg.querySelector(".cb-confirm-msg").textContent = evt.detail.question;
+        dlg.returnValue = "";
+        dlg.addEventListener(
+          "close",
+          function () {
+            if (dlg.returnValue === "ok") {
+              evt.detail.issueRequest(true);
+            }
+          },
+          { once: true }
+        );
+        dlg.showModal();
+      });
+    </script>
+    {{ template "openrun_gen_import" . }}
+    <script src="{{ static "lib/hyperscript.min.js" }}"></script>
+  </head>
+{{ end }}
+
+{{/* page is the shared shell; each page file defines "content" and
+  renders this
+*/}}
+{{ define "page" }}
+  <!DOCTYPE html>
+  <html lang="en">
+    {{ template "head" . }}
+    <body class="min-h-dvh bg-base-200">
+      <div class="mx-auto w-full max-w-xl md:max-w-3xl px-4 pb-20">
+        {{ template "navbar" . }}
+        {{ template "content" . }}
+        {{ template "footer" . }}
+      </div>
+      {{ template "name_modal" . }}
+      {{ template "page_end" . }}
+    </body>
+  </html>
+{{ end }}
+
+{{ define "navbar" }}
+  <header class="navbar px-0 mb-2">
+    <div class="flex-1">
+      <a href="{{ .AppPath }}/" class="flex items-center gap-2">
+        <img
+          src="{{ static "images/cowbull.svg" }}"
+          alt="CowBull"
+          class="w-10 h-10 md:w-12 md:h-12" />
+        <span class="text-2xl md:text-3xl font-black tracking-tight"
+          >CowBull</span
+        >
+      </a>
+    </div>
+    <div class="flex-none flex items-center gap-1">
+      {{ template "player_chip" . }}
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm btn-circle text-lg"
+        onclick="cbToggleTheme()"
+        aria-label="Switch between light and dark theme">
+        {{ template "icon_moon" "w-5 h-5" }}
+      </button>
+      <a
+        href="{{ .AppPath }}/help"
+        class="btn btn-ghost btn-sm btn-circle text-lg"
+        aria-label="How to play"
+        >{{ template "icon_help" "w-5 h-5" }}</a
+      >
+    </div>
+  </header>
+{{ end }}
+
+{{ define "player_chip" }}
+  {{ $pname := queryUnescape .Data.PlayerNameEnc }}
+  <button
+    id="player-chip"
+    class="btn btn-sm {{ if $pname }}
+      btn-ghost
+    {{ else }}
+      btn-outline btn-primary
+    {{ end }} max-w-40"
+    _="on click call #name_modal.showModal()">
+    <span class="truncate"
+      >{{ template "icon_user" "w-4 h-4" }}
+      {{ if $pname }}{{ $pname }}{{ else }}Set name{{ end }}</span
+    >
+  </button>
+{{ end }}
+
+{{ define "level_picker" }}
+  <div class="join w-full">
+    <input
+      class="join-item btn flex-1"
+      type="radio"
+      name="level"
+      value="Easy"
+      aria-label="Easy" />
+    <input
+      class="join-item btn flex-1"
+      type="radio"
+      name="level"
+      value="Medium"
+      aria-label="Medium"
+      checked />
+    <input
+      class="join-item btn flex-1"
+      type="radio"
+      name="level"
+      value="Hard"
+      aria-label="Hard" />
+  </div>
+{{ end }}
+
+{{ define "name_modal" }}
+  {{ $pname := queryUnescape .Data.PlayerNameEnc }}
+  <dialog id="name_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">Pick your name</h3>
+      <p class="py-2 text-sm opacity-70">
+        Shown to other players and saved on this device — no account needed.
+        Leave it empty and we'll give you a random one.
+      </p>
+      {{/* posts straight to the Go API (proxied) which sets the cookies and
+        asks htmx to reload the page
+      */}}
+      <form hx-post="{{ .AppPath }}/api/player" hx-swap="none">
+        <input
+          id="name-input"
+          name="name"
+          value="{{ $pname }}"
+          placeholder="Your name"
+          maxlength="24"
+          autocomplete="off"
+          class="input input-bordered input-lg w-full" />
+        <div class="modal-action">
+          <button
+            type="button"
+            class="btn btn-ghost"
+            _="on click call #name_modal.close()">
+            Cancel
+          </button>
+          <button type="submit" class="btn btn-primary">Save name</button>
+        </div>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+{{ end }}
+
+{{ define "footer" }}
+  <footer class="mt-14 text-center text-xs opacity-40">
+    CowBull · quick word games with friends · no account needed
+  </footer>
+{{ end }}
+
+{{/* page_end renders the toast area; every page puts it right before the
+  closing body tag.
+  Class anchor for the SSE toasts generated by the Go server, keep in sync
+  with router.go: alert shadow-lg bg-base-100 text-sm
+*/}}
+{{ define "page_end" }}
+  {{ template "confirm_modal" . }}
+  <div
+    id="toasts"
+    class="toast toast-top toast-center md:toast-end z-50 max-w-[94vw]"></div>
+  {{ if not .Data.PlayerId }}
+    {{/* First visit: get a stable player id assigned (cookie set by the
+      container endpoint)
+    */}}
+    <span
+      class="hidden"
+      hx-post="{{ .AppPath }}/api/player/ensure"
+      hx-trigger="load"
+      hx-swap="none"></span>
+  {{ end }}
+{{ end }}
+
+{{/* confirm_modal is the styled replacement for the native hx-confirm
+  popup, driven by the htmx:confirm listener in the head script
+*/}}
+{{ define "confirm_modal" }}
+  <dialog id="confirm_modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box">
+      <h3 class="text-lg font-bold">
+        {{ template "icon_alert" "w-5 h-5 text-warning" }} Hold on
+      </h3>
+      <p class="cb-confirm-msg py-3 text-sm"></p>
+      <form method="dialog" class="modal-action">
+        <button type="submit" class="btn btn-ghost">Cancel</button>
+        <button type="submit" value="ok" class="btn btn-error">
+          Yes, do it
+        </button>
+      </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  </dialog>
+{{ end }}
+
+{{ define "score_result" }}
+  {{ if .Data.ScoreError }}
+    <span class="text-sm text-error">{{ .Data.ScoreError }}</span>
+  {{ else }}
+    <div class="stats bg-base-200">
+      <div class="stat py-2 px-4">
+        <div class="stat-title text-xs">Score</div>
+        <div class="stat-value text-primary text-3xl">{{ .Data.Score }}</div>
+        <div class="stat-desc">out of 10</div>
+      </div>
+    </div>
+  {{ end }}
+{{ end }}
+
+{{ define "error_block" }}
+  <div
+    class="alert alert-error text-sm shadow-lg"
+    _="on load wait 6s then remove me">
+    {{ template "icon_alert" "w-4 h-4" }} {{ .Data.Message }}
+  </div>
+{{ end }}
+
+{{/* player_label renders "Name (Location)" with the location subdued,
+  when known. Context: a Board player row
+*/}}
+{{ define "player_label" }}
+  {{- .Name -}}
+  {{- if and .Location (ne .Location "Unknown") }}
+    <span class="text-xs opacity-50 font-normal">({{ .Location }})</span>
+  {{- end -}}
+{{ end }}
+
+{{/* board_card renders the standings + activity feed for a challenge or
+  tournament. Used by the lobby page and the game page, refreshed over SSE.
+  Context: .Data.Board is the board JSON from the Go API
+*/}}
+{{ define "board_card" }}
+  {{ $b := .Data.Board }}
+  {{ $rounds := int $b.NumRounds }}
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-5 md:p-6 space-y-2">
+      <h3 class="card-title text-base">{{ template "icon_medal" "w-5 h-5 text-primary" }} Standings</h3>
+
+      {{ if not $b.Players }}
+        <p class="text-sm opacity-60">No games yet — be the first to play!</p>
+      {{ else if eq $rounds 1 }}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr class="border-base-200">
+                <th class="font-medium">Player</th>
+                <th class="text-right font-medium">Guesses</th>
+                <th class="text-right font-medium">Hints</th>
+                <th class="text-right font-medium">Time</th>
+                <th class="text-right font-medium">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range $b.Players }}
+                {{ $r := index .Rounds 0 }}
+                <tr
+                  class="border-base-200 {{ if .IsLeader }}
+                    bg-primary/10 font-semibold
+                  {{ end }}">
+                  <td>
+                    {{ if .IsLeader }}{{ template "icon_crown" "w-4 h-4 text-primary" }}{{ end }}
+                    {{ template "player_label" . }}
+                  </td>
+                  {{ if $r }}
+                    <td class="text-right">{{ int $r.Guesses }}</td>
+                    <td class="text-right">{{ int $r.Hints }}</td>
+                    <td class="text-right">{{ $r.Time }}</td>
+                    <td class="text-right">
+                      {{ if eq $r.Status "COMPLETED" }}
+                        <span class="badge badge-primary">{{ $r.ScoreS }}</span>
+                      {{ else if eq $r.Status "RESIGNED" }}
+                        {{ template "icon_flag" "w-4 h-4 opacity-60" }}
+                      {{ else }}
+                        <span class="loading loading-dots loading-xs"></span>
+                      {{ end }}
+                    </td>
+                  {{ else }}
+                    <td colspan="4" class="text-right opacity-50">—</td>
+                  {{ end }}
+                </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      {{ else }}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr class="border-base-200">
+                <th class="font-medium">Player</th>
+                {{ range $k := until $rounds }}
+                  <th class="text-center font-medium">R{{ add $k 1 }}</th>
+                {{ end }}
+                <th class="text-right font-medium">Total</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range $b.Players }}
+                <tr
+                  class="border-base-200 {{ if .IsLeader }}
+                    bg-primary/10 font-semibold
+                  {{ end }}">
+                  <td>
+                    {{ if .IsLeader }}{{ template "icon_crown" "w-4 h-4 text-primary" }}{{ end }}
+                    {{ template "player_label" . }}
+                    <div class="text-xs opacity-60 font-normal whitespace-nowrap">
+                      {{ int .CurGuesses }} guesses
+                    </div>
+                    <div class="text-xs opacity-60 font-normal whitespace-nowrap">
+                      {{ int .CurHints }} hints
+                    </div>
+                  </td>
+                  {{ range .Rounds }}
+                    <td class="text-center">
+                      {{ if . }}
+                        {{ if eq .Status "COMPLETED" }}
+                          {{ .ScoreS }}
+                        {{ else if eq .Status "RESIGNED" }}
+                          {{ template "icon_flag" "w-4 h-4 opacity-60" }}
+                        {{ else }}
+                          <span class="loading loading-dots loading-xs"></span>
+                        {{ end }}
+                      {{ else }}
+                        <span class="opacity-30">·</span>
+                      {{ end }}
+                    </td>
+                  {{ end }}
+                  <td class="text-right font-bold">{{ .TotalS }}</td>
+                  <td class="text-right">
+                    {{ if .Finished }}
+                      <span class="badge badge-success badge-sm">Finished</span>
+                    {{ else if .DNF }}
+                      <span
+                        class="badge badge-ghost badge-sm"
+                        title="Stopped early — the total still counts"
+                        >DNF</span
+                      >
+                    {{ else }}
+                      <span class="badge badge-info badge-sm">Playing</span>
+                    {{ end }}
+                  </td>
+                </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+        <p class="text-xs opacity-60">
+          Running tally: every finished round adds to the total, even for
+          players who stop early. Highest total wins.
+        </p>
+      {{ end }}
+
+      {{ if $b.Events }}
+        <h3 class="card-title text-base mt-3">{{ template "icon_megaphone" "w-5 h-5 text-primary" }} Activity</h3>
+        <ul class="text-sm space-y-1 max-h-44 overflow-y-auto">
+          {{ range $b.Events }}
+            <li class="flex justify-between gap-3">
+              <span>{{ .Message }}</span>
+              {{ if .EventTime }}
+                {{ $t := toDate "2006-01-02T15:04:05Z07:00" .EventTime }}
+                <span class="text-xs opacity-50 whitespace-nowrap"
+                  >{{ ago $t }} ago</span
+                >
+              {{ end }}
+            </li>
+          {{ end }}
+        </ul>
+      {{ end }}
+    </div>
+  </div>
+{{ end }}
+
+{{ define "game_main" }}
+  {{ $g := .Data.Game }}
+  <div class="card bg-base-100 shadow-sm relative overflow-hidden">
+    {{ if .Data.Won }}
+      <div class="confetti" aria-hidden="true">
+        {{ range until 14 }}<span></span>{{ end }}
+      </div>
+    {{ end }}
+    <div class="card-body p-5 md:p-7 space-y-4">
+      {{ if .Data.Error }}
+        <div role="alert" class="alert alert-error py-2 text-sm animate-shake">
+          <span>{{ template "icon_alert" "w-4 h-4" }} {{ .Data.Error }}</span>
+        </div>
+      {{ end }}
+
+      {{ if eq $g.Status "COMPLETED" }}
+        <div class="text-center py-2">
+          <div class="flex justify-center">{{ template "icon_trophy" "w-14 h-14 text-primary" }}</div>
+          <h2 class="text-2xl font-black mt-1">{{ .Data.Pun }}</h2>
+          {{ if $g.Word }}
+            <p class="mt-2">
+              The word was
+              <a
+                class="link link-primary font-mono text-xl font-bold tracking-widest"
+                target="_blank"
+                href="https://www.merriam-webster.com/dictionary/{{ $g.Word }}"
+                >{{ upper $g.Word }}</a
+              >
+            </p>
+          {{ end }}
+          <div class="mt-3 flex justify-center">
+            <div class="stats bg-base-200">
+              <div class="stat py-2 px-4">
+                <div class="stat-title text-xs">Score</div>
+                <div class="stat-value text-primary text-3xl">
+                  {{ $g.Score }}
+                </div>
+                <div class="stat-desc">out of 10</div>
+              </div>
+              <div class="stat py-2 px-4">
+                <div class="stat-title text-xs">Guesses</div>
+                <div class="stat-value text-3xl">{{ int $g.GuessCount }}</div>
+                <div class="stat-desc">
+                  {{ int $g.HintCount }} hints · {{ $g.Time }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 flex flex-wrap justify-center gap-2">
+            <button
+              class="btn btn-outline btn-sm"
+              data-share="I scored {{ $g.Score }}/10 on CowBull in {{ int $g.GuessCount }} guesses ({{ $g.Time }}). Can you beat that?"
+              _="on click call navigator.clipboard.writeText(@data-share)
+                 then put 'Copied!' into the first <span.cb-label/> in me
+                 then wait 2s then put 'Copy result' into the first <span.cb-label/> in me">
+              {{ template "icon_copy" "w-4 h-4" }}
+              <span class="cb-label">Copy result</span>
+            </button>
+            {{ template "next_step_buttons" . }}
+          </div>
+        </div>
+      {{ else if eq $g.Status "RESIGNED" }}
+        <div class="text-center py-2">
+          <div class="flex justify-center">{{ template "icon_flag" "w-14 h-14 opacity-60" }}</div>
+          <h2 class="text-xl font-black mt-1">The word won this time</h2>
+          {{ if $g.Word }}
+            <p class="mt-2">
+              It was
+              <a
+                class="link link-primary font-mono text-xl font-bold tracking-widest"
+                target="_blank"
+                href="https://www.merriam-webster.com/dictionary/{{ $g.Word }}"
+                >{{ upper $g.Word }}</a
+              >
+            </p>
+          {{ else }}
+            <p class="mt-2 text-sm opacity-70">
+              The word stays hidden while others are still playing.
+            </p>
+          {{ end }}
+          <div class="mt-4 flex flex-wrap justify-center gap-2">
+            {{ template "next_step_buttons" . }}
+          </div>
+        </div>
+      {{ else }}
+        <form
+          hx-post="{{ .Data.GamePath }}/submit"
+          hx-target="#game_info"
+          hx-swap="innerHTML transition:true"
+          class="flex gap-2">
+          <input
+            name="guess"
+            type="text"
+            placeholder="WORD"
+            minlength="4"
+            maxlength="4"
+            pattern="[A-Za-z]{4}"
+            required
+            autofocus
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            enterkeyhint="go"
+            class="input input-bordered input-lg flex-1 min-w-0 text-center font-mono uppercase tracking-[0.4em]"
+            _="on load call me.focus()" />
+          <button type="submit" class="btn btn-primary btn-lg">
+            <span
+              class="loading loading-spinner loading-xs htmx-indicator"></span>
+            Guess
+          </button>
+        </form>
+
+        <div class="flex items-center justify-between gap-2">
+          <form
+            class="shrink-0"
+            hx-post="{{ .Data.GamePath }}/resign"
+            hx-target="#game_info"
+            hx-swap="innerHTML transition:true"
+            hx-confirm="Give up? This round ends.">
+            <button
+              type="submit"
+              class="btn btn-ghost btn-xs opacity-70 whitespace-nowrap">
+              {{ template "icon_flag" "w-3.5 h-3.5" }} Give up
+            </button>
+          </form>
+          <span class="text-xs opacity-50 italic truncate min-w-0"
+            >{{ .Data.Nudge }}</span
+          >
+          <form
+            class="shrink-0"
+            hx-post="{{ .Data.GamePath }}/hint"
+            hx-target="#game_info"
+            hx-swap="innerHTML transition:true">
+            <button
+              type="submit"
+              class="btn btn-ghost btn-xs opacity-70 whitespace-nowrap">
+              {{ template "icon_bulb" "w-3.5 h-3.5" }} Hint
+            </button>
+          </form>
+        </div>
+      {{ end }}
+
+      <!-- Guess history -->
+      <div>
+        <div class="overflow-x-auto">
+          <table class="table">
+            <thead>
+              <tr class="border-base-200">
+                <th class="font-medium">Word</th>
+                <th class="font-medium">
+                  Bulls {{ template "icon_bull" "w-3.5 h-3.5" }}
+                </th>
+                <th class="font-medium">
+                  Cows {{ template "icon_cow" "w-4 h-4" }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {{ range $g.Clues }}
+                <tr
+                  class="border-base-200 {{ if .Hint }}bg-warning/10{{ end }}">
+                  <td class="whitespace-nowrap">
+                    <a
+                      class="font-mono text-lg font-bold tracking-[0.25em] link-hover"
+                      target="_blank"
+                      href="https://www.merriam-webster.com/dictionary/{{ .Clue }}"
+                      >{{ upper .Clue }}</a
+                    >
+                    {{ if .Hint }}
+                      <span class="badge badge-warning badge-xs">hint</span>
+                    {{ end }}
+                  </td>
+                  <td class="whitespace-nowrap leading-none">
+                    {{ if eq (int .Bulls) 0 }}
+                      <span class="opacity-30">–</span>
+                    {{ else }}
+                      {{ range until (int .Bulls) }}
+                        {{ template "icon_bull" "w-5 h-5 text-secondary" }}
+                      {{ end }}
+                    {{ end }}
+                  </td>
+                  <td class="whitespace-nowrap leading-none">
+                    {{ if eq (int .Cows) 0 }}
+                      <span class="opacity-30">–</span>
+                    {{ else }}
+                      {{ range until (int .Cows) }}
+                        {{ template "icon_cow" "w-5 h-5 text-primary" }}
+                      {{ end }}
+                    {{ end }}
+                  </td>
+                </tr>
+              {{ else }}
+                <tr class="border-base-200">
+                  <td colspan="3" class="text-center text-sm opacity-60 py-3">
+                    No guesses yet. Any valid 4-letter word gets you clues!
+                  </td>
+                </tr>
+              {{ end }}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{{ end }}
+
+{{ define "next_step_buttons" }}
+  {{ $g := .Data.Game }}
+  {{ if $g.ChallengeId }}
+    {{ if lt (int $g.Round) (int $g.NumRounds) }}
+      <form
+        action="{{ .AppPath }}/challenge/{{ $g.ChallengeId }}/play"
+        method="post">
+        <button type="submit" class="btn btn-primary btn-sm">
+          {{ template "icon_play" "w-4 h-4" }} Next round
+        </button>
+      </form>
+    {{ end }}
+    <a
+      href="{{ .AppPath }}/challenge/{{ $g.ChallengeId }}"
+      class="btn btn-secondary btn-sm"
+      >{{ template "icon_medal" "w-4 h-4" }} Standings</a
+    >
+  {{ else }}
+    <a href="{{ .AppPath }}/" class="btn btn-secondary btn-sm">{{ template "icon_home" "w-4 h-4" }} Home</a>
+  {{ end }}
+{{ end }}

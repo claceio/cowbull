@@ -1,0 +1,110 @@
+{{ define "content" }}
+
+
+      <div class="text-center mt-4 mb-8 px-2">
+        <p class="text-sm md:text-base opacity-70">
+          Find the hidden 4-letter word.
+          <b>{{ template "icon_bull" "w-4 h-4" }} Bull</b> = right letter, right spot. <b>{{ template "icon_cow" "w-4 h-4" }} Cow</b> = right
+          letter, wrong spot.
+        </p>
+      </div>
+
+      <div class="space-y-6">
+        <!-- Solo game -->
+        <div class="card bg-base-100 shadow-sm">
+          <div class="card-body p-5 md:p-7">
+            <h2 class="card-title text-lg">{{ template "icon_bull" "w-5 h-5 text-primary" }} Solo game</h2>
+            <p class="text-sm opacity-70 -mt-1">
+              Just you and the word. Fewer guesses, better score.
+            </p>
+            <form action="{{ .AppPath }}/game" method="post" class="mt-3 space-y-4">
+              {{ template "level_picker" . }}
+              <button type="submit" class="btn btn-primary btn-block btn-lg">
+                Start game
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Multi player -->
+        <div class="card bg-base-100 shadow-sm">
+          <div class="card-body p-5 md:p-7">
+            <h2 class="card-title text-lg">{{ template "icon_users" "w-5 h-5 text-primary" }} Play with friends</h2>
+            <p class="text-sm opacity-70 -mt-1">
+              Everyone gets the same words — share the code, highest total
+              wins.
+            </p>
+            <form
+              action="{{ .AppPath }}/challenge"
+              method="post"
+              class="mt-3 space-y-4">
+              {{ template "level_picker" . }}
+
+
+              <div class="px-1">
+                <label
+                  class="flex items-center justify-between text-sm font-medium">
+                  <span>Rounds</span>
+                  <span class="badge badge-primary" id="rounds-val">3</span>
+                </label>
+                <input
+                  type="range"
+                  name="rounds"
+                  min="1"
+                  max="8"
+                  value="3"
+                  class="range range-primary range-sm mt-1"
+                  _="on input put my value into #rounds-val" />
+                <p class="text-xs opacity-60 mt-1">
+                  1 round is a quick match. Every round adds to your total —
+                  highest total wins.
+                </p>
+              </div>
+
+              <input
+                type="text"
+                name="title"
+                maxlength="40"
+                autocomplete="off"
+                placeholder="Game name (optional)"
+                class="input input-bordered w-full" />
+
+              <button type="submit" class="btn btn-secondary btn-block btn-lg">
+                Set up game
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Join -->
+        <div class="card bg-base-100 shadow-sm">
+          <div class="card-body p-5 md:p-7">
+            <h2 class="card-title text-lg">{{ template "icon_key" "w-5 h-5 text-primary" }} Join a game</h2>
+            <form
+              action="{{ .AppPath }}/join"
+              method="post"
+              class="mt-3 flex gap-2">
+              <input
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="characters"
+                spellcheck="false"
+                class="input input-bordered input-lg flex-1 min-w-0 uppercase tracking-widest font-mono"
+                placeholder="CODE"
+                type="text"
+                name="id"
+                minlength="4"
+                maxlength="5"
+                required />
+              <button type="submit" class="btn btn-primary btn-lg">Join</button>
+            </form>
+            <p class="text-xs opacity-60">
+              4-letter codes join a shared game, 5-letter codes open a single
+              game.
+            </p>
+          </div>
+        </div>
+      </div>
+{{ end }}
+
+{{ template "page" . }}

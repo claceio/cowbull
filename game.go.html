@@ -1,0 +1,96 @@
+{{ define "content" }}
+
+      {{ $g := .Data.Game }}
+      {{ if $g.ChallengeId }}
+        <div
+          hx-ext="sse"
+          sse-connect="{{ .AppPath }}/api/challenge/{{ $g.ChallengeId }}/events">
+          <div
+            class="hidden"
+            sse-swap="activity"
+            hx-target="#toasts"
+            hx-swap="afterbegin"></div>
+
+          <div class="mt-2 mb-5">
+            {{ if $g.ChallengeTitle }}
+              <h2 class="text-center text-lg font-black break-words mb-1">
+                {{ $g.ChallengeTitle }}
+              </h2>
+            {{ end }}
+            <div class="flex items-center justify-between gap-2">
+              <a
+                href="{{ .AppPath }}/challenge/{{ $g.ChallengeId }}"
+                class="btn btn-ghost btn-sm"
+                >← Lobby {{ $g.ChallengeId }}</a
+              >
+              {{ if gt (int $g.NumRounds) 1 }}
+                <span class="badge badge-secondary badge-lg font-bold"
+                  >Round {{ int $g.Round }} of {{ int $g.NumRounds }}</span
+                >
+              {{ else if not $g.ChallengeTitle }}
+                <span class="badge badge-secondary badge-lg font-bold"
+                  >{{ template "icon_swords" "w-4 h-4" }} Friendly match</span
+                >
+              {{ end }}
+            </div>
+          </div>
+      {{ end }}
+
+      <div id="game_info">{{ template "game_main" . }}</div>
+
+      <!-- Letter tracker: client side only, survives guess swaps -->
+      <div class="collapse collapse-arrow bg-base-100 shadow-sm mt-6">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-semibold">
+          {{ template "icon_type" "w-4 h-4" }} Letters
+          <span class="opacity-50 font-normal">tap to rule them out</span>
+        </div>
+        <div class="collapse-content">
+          <div class="grid grid-cols-7 sm:grid-cols-9 gap-1.5">
+            {{ range splitList "" "ABCDEFGHIJKLMNOPQRSTUVWXYZ" }}
+              <button
+                type="button"
+                class="btn btn-sm btn-ghost bg-base-200 font-mono text-base"
+                _="on click toggle .letter-off on me">
+                {{ . }}
+              </button>
+            {{ end }}
+          </div>
+        </div>
+      </div>
+
+      {{ if $g.ChallengeId }}
+        <div
+          class="mt-6"
+          hx-get="{{ .AppPath }}/challenge/{{ $g.ChallengeId }}/board"
+          hx-trigger="sse:board"
+          hx-target="this"
+          hx-swap="innerHTML">
+          {{ if .Data.Board }}
+            {{ template "board_card" . }}
+          {{ end }}
+        </div>
+        </div><!-- end sse wrapper -->
+      {{ else }}
+        <div class="card bg-base-100 shadow-sm mt-6">
+          <div class="card-body p-4 md:p-6">
+            <h2 class="card-title text-base">{{ template "icon_refresh" "w-4 h-4" }} Play another?</h2>
+            <form action="{{ .AppPath }}/game" method="post" class="mt-1 space-y-3">
+              {{ template "level_picker" . }}
+              <button type="submit" class="btn btn-primary btn-block">
+                New game
+              </button>
+            </form>
+          </div>
+        </div>
+      {{ end }}
+
+      <p class="mt-8 text-center text-xs opacity-50">
+        Game {{ $g.GameId }}{{ if $g.CreatedAgo }}
+          · created {{ $g.CreatedAgo }} ago
+        {{ end }}
+        · guesses are 4-letter words, no repeated letters
+      </p>
+{{ end }}
+
+{{ template "page" . }}

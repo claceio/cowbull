@@ -1,13 +1,16 @@
+// Package api implements the game rules, scoring and live events for
+// CowBull, a bulls-and-cows word game.
 package api
 
 import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"math/rand"
 	"net"
-	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,154 +23,105 @@ const (
 	CleanupStarted   = 14 * 24 * time.Hour
 	CleanupCompleted = 60 * 24 * time.Hour
 	CleanupResigned  = 30 * 24 * time.Hour
+
+	TypeTournament = "TOURNAMENT"
+
+	MaxRounds = 10
 )
 
 type GameAPI struct {
-	db          *gamedb.GameDB
-	ipLookup    *geoip2.Reader
-	dictFile    string
-	words       []string
-	wordsEasy   []string
-	wordsMedium []string
-	wordsHard   []string
-	wordDict    map[string]bool
+	db       *gamedb.GameDB
+	Events   *Broker
+	ipLookup *geoip2.Reader
+	wordFS   fs.FS
+	stop     chan struct{}
+	// Only the main dictionary stays in memory; level word lists are
+	// streamed from the embedded files on demand.
+	wordDict map[string]bool
 }
 
-func NewGameAPI(db *gamedb.GameDB, dictFile string, ipLookupFile string) *GameAPI {
+func NewGameAPI(db *gamedb.GameDB, wordFS fs.FS, ipLookupFile string) *GameAPI {
 	ipLookup, err := geoip2.Open(ipLookupFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Printf("GeoIP lookup disabled: %s", err)
+		ipLookup = nil
 	}
 
-	g := &GameAPI{db: db, ipLookup: ipLookup, dictFile: dictFile}
-	rand.Seed(time.Now().UnixNano())
-	g.initDict()
+	g := &GameAPI{db: db, ipLookup: ipLookup, wordFS: wordFS, Events: NewBroker(), stop: make(chan struct{})}
+	g.wordDict = make(map[string]bool)
+	g.scanWords("words.txt", func(word string) {
+		g.wordDict[word] = true
+	})
 	return g
 }
 
-func (g *GameAPI) initDict() {
-	g.words = loadWords(g.dictFile)
-	g.wordsEasy = loadWords("words_easy.txt")
-	g.wordsMedium = loadWords("words_medium.txt")
-	g.wordsHard = loadWords("words_hard.txt")
-
-	rand.Shuffle(len(g.words), func(i, j int) {
-		g.words[i], g.words[j] = g.words[j], g.words[i]
-	})
-
-	g.wordDict = make(map[string]bool)
-	for _, word := range g.words {
-		g.wordDict[word] = true
-	}
-}
-
-func loadWords(file string) []string {
-	f, err := os.Open(file)
+// scanWords streams a word file line by line without keeping it in memory.
+func (g *GameAPI) scanWords(file string, fn func(word string)) {
+	f, err := g.wordFS.Open(file)
 	if err != nil {
 		panic(err)
 	}
+	defer func() { _ = f.Close() }()
 
-	words := make([]string, 0, 6000)
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		word := strings.ToLower(scanner.Text())
-		words = append(words, word)
+		word := strings.ToLower(strings.TrimSpace(scanner.Text()))
+		if word != "" {
+			fn(word)
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		panic(err)
 	}
-
-	return words
 }
 
+// getWord reservoir-samples one word from the level's word file.
 func (g *GameAPI) getWord(level string) string {
-	level = strings.ToLower(level)
-	randWord := ""
-	switch level {
+	file := "words_hard.txt"
+	switch strings.ToLower(level) {
 	case "easy":
-		randIndex := rand.Intn(len(g.wordsEasy))
-		randWord = g.wordsEasy[randIndex]
+		file = "words_easy.txt"
 	case "medium":
-		randIndex := rand.Intn(len(g.wordsMedium))
-		randWord = g.wordsMedium[randIndex]
-	default:
-		randIndex := rand.Intn(len(g.wordsHard))
-		randWord = g.wordsHard[randIndex]
-
+		file = "words_medium.txt"
 	}
-	return randWord
-}
 
-func (g *GameAPI) CreateChallenge(ipAddr string, level string) (map[string]string, error) {
-	var randWord = g.getWord(level)
-	var challengeId string
-	for {
-		challengeId = randSeq(4)
-		err := g.db.CreateChallenge(challengeId, ipAddr, randWord)
-		if err != nil {
-			log.Println(err)
-			continue
+	picked := ""
+	count := 0
+	g.scanWords(file, func(word string) {
+		count++
+		if rand.Intn(count) == 0 {
+			picked = word
 		}
-		break
+	})
+	if picked == "" {
+		panic("no words found in " + file)
 	}
-	return map[string]string{"ChallengeId": challengeId, "Status": ""}, nil
-}
-
-func (g *GameAPI) GetChallenge(challengeId string) (map[string]interface{}, error) {
-	challengeId = strings.ToUpper(challengeId)
-	_, err := g.db.GetChallenge(challengeId)
-	if err != nil {
-		return nil, err
-	}
-
-	// Don't return the word!!
-	return map[string]interface{}{"Status": "", "Challenge_Id": challengeId}, nil
-}
-
-func (g *GameAPI) GetChallengeGames(challengeId string) ([]map[string]interface{}, error) {
-	challengeId = strings.ToUpper(challengeId)
-	games, err := g.db.GetChallengeGames(challengeId)
-	if err != nil {
-		return nil, err
-	}
-
-	chGames := make([]map[string]interface{}, 0, len(games))
-	for _, game := range games {
-		gameStatus, err := g.GetGame(game)
-		if err != nil {
-			return nil, err
-		}
-		delete(gameStatus, "Clues")
-		delete(gameStatus, "GameId")
-		delete(gameStatus, "Word")
-		chGames = append(chGames, gameStatus)
-	}
-
-	return chGames, err
+	return picked
 }
 
 func (g *GameAPI) getLocation(ipAddr string) string {
-	ipAddr = strings.Split(ipAddr, ":")[0]
-	ipAddr = strings.Split(ipAddr, ",")[0]
-	ip := net.ParseIP(ipAddr)
+	if g.ipLookup == nil {
+		return "Unknown"
+	}
+	ipAddr = strings.TrimSpace(strings.Split(ipAddr, ",")[0])
+	if host, _, err := net.SplitHostPort(ipAddr); err == nil {
+		ipAddr = host
+	}
+
 	location := ""
-	if ip != nil {
-		record, err := g.ipLookup.City(ip)
-		fmt.Printf("%#v", record)
-		if err == nil {
-			if record.City.Names["en"] != "N/A" {
-				location += record.City.Names["en"]
+	if ip := net.ParseIP(ipAddr); ip != nil {
+		if record, err := g.ipLookup.City(ip); err == nil {
+			if name := record.City.Names["en"]; name != "N/A" {
+				location = name
 			}
-			if len(location) == 0 {
-				if len(record.Subdivisions) > 0 && record.Subdivisions[0].Names["en"] != "N/A" {
-					location += record.Subdivisions[0].Names["en"]
-				}
+			if location == "" && len(record.Subdivisions) > 0 && record.Subdivisions[0].Names["en"] != "N/A" {
+				location = record.Subdivisions[0].Names["en"]
 			}
-			if record.Country.Names["en"] != "N/A" {
-				if len(location) != 0 {
+			if name := record.Country.Names["en"]; name != "N/A" {
+				if location != "" {
 					location += " "
 				}
-				location += record.Country.Names["en"]
+				location += name
 			}
 		}
 	}
@@ -177,175 +131,338 @@ func (g *GameAPI) getLocation(ipAddr string) string {
 	return location
 }
 
-func (g *GameAPI) StartChallengeGame(challengeId string, ipAddr string) (map[string]string, error) {
+// challengeRounds returns the round count for a challenge, defaulting to 1.
+func (g *GameAPI) challengeRounds(challengeId string) int {
+	if ch, err := g.db.GetChallenge(challengeId); err == nil {
+		return ch.NumRounds
+	}
+	return 1
+}
+
+// publish stores an activity event and pushes it to connected players.
+func (g *GameAPI) publish(challengeId, origin, message string) {
+	if challengeId == "" || message == "" {
+		return
+	}
+	if err := g.db.InsertEvent(challengeId, message); err != nil {
+		log.Printf("event insert failed: %s", err)
+	}
+	g.Events.Publish(challengeId, Event{Name: "activity", Data: message, Origin: origin})
+}
+
+// createGame inserts a game with a fresh unique id and returns the id.
+func (g *GameAPI) createGame(word, ipAddr, location, challengeId string, round int, playerId, playerName string) string {
+	for {
+		gameId := randSeq(5)
+		if err := g.db.CreateGame(gameId, word, ipAddr, location, challengeId, round, playerId, playerName); err != nil {
+			log.Println(err)
+			continue
+		}
+		return gameId
+	}
+}
+
+// CreateChallenge creates a multi-player tournament of 1..MaxRounds
+// rounds; a single round is a quick match. title is an optional display
+// name.
+func (g *GameAPI) CreateChallenge(ipAddr, level string, numRounds int, title string) (string, error) {
+	numRounds = min(max(numRounds, 1), MaxRounds)
+
+	words := make([]string, 0, numRounds)
+	used := map[string]bool{}
+	for len(words) < numRounds {
+		w := g.getWord(level)
+		if used[w] {
+			continue
+		}
+		used[w] = true
+		words = append(words, w)
+	}
+
+	var challengeId string
+	for {
+		challengeId = randSeq(4)
+		// challenges.word keeps the round 1 word for backward compatibility
+		err := g.db.CreateChallenge(challengeId, ipAddr, words[0], TypeTournament, numRounds, SanitizeTitle(title))
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		break
+	}
+	for i, w := range words {
+		if err := g.db.InsertChallengeWord(challengeId, i+1, w); err != nil {
+			return "", err
+		}
+	}
+	return challengeId, nil
+}
+
+func (g *GameAPI) GetChallenge(challengeId string) (*gamedb.Challenge, error) {
+	return g.db.GetChallenge(challengeId)
+}
+
+func (g *GameAPI) getChallengeWord(challengeId string, round int) (string, error) {
+	word, err := g.db.GetChallengeWord(challengeId, round)
+	if err == nil {
+		return word, nil
+	}
+	// Pre-tournament challenges only have the word on the challenge row
+	if round == 1 {
+		ch, cerr := g.db.GetChallenge(challengeId)
+		if cerr != nil {
+			return "", cerr
+		}
+		return ch.Word, nil
+	}
+	return "", err
+}
+
+// StartChallengeGame starts (or resumes) the player's next round and
+// returns the game id to play.
+func (g *GameAPI) StartChallengeGame(challengeId, ipAddr, playerId, playerName string) (string, error) {
 	challengeId = strings.ToUpper(challengeId)
 	challenge, err := g.db.GetChallenge(challengeId)
 	if err != nil {
-		return nil, err
+		return "", err
+	}
+
+	// Nameless players get a generated name, sticky via their player id
+	if playerName == "" {
+		playerName = g.db.LastPlayerName(playerId)
+		if playerName == "" {
+			playerName = generatePlayerName()
+		}
+	}
+
+	prevGames, err := g.db.GetPlayerChallengeGames(challengeId, playerId)
+	if err != nil {
+		return "", err
+	}
+	for _, gs := range prevGames {
+		if gs.Status == "CREATED" || gs.Status == "STARTED" {
+			return gs.GameId, nil // resume the in-progress round
+		}
+	}
+
+	round := len(prevGames) + 1
+	if round > challenge.NumRounds {
+		return "", errors.New("you have played all rounds of this game")
+	}
+
+	word, err := g.getChallengeWord(challengeId, round)
+	if err != nil {
+		return "", err
 	}
 
 	location := g.getLocation(ipAddr)
-	var gameId string
-	for {
-		gameId = randSeq(5)
-		err := g.db.CreateGame(gameId, challenge.Word, ipAddr, location, challengeId)
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		break
+	gameId := g.createGame(word, ipAddr, location, challengeId, round, playerId, playerName)
+
+	if round == 1 {
+		g.publish(challengeId, playerId, joinMessage(playerName, location))
+	} else {
+		g.publish(challengeId, playerId, roundStartMessage(playerName, location, round, challenge.NumRounds))
 	}
-	return map[string]string{"GameId": gameId, "Status": ""}, nil
+	return gameId, nil
 }
 
-func (g *GameAPI) StartGame(ipAddr string, level string) map[string]string {
-	var randWord = g.getWord(level)
-	location := g.getLocation(ipAddr)
-	var gameId string
-	for {
-		gameId = randSeq(5)
-		err := g.db.CreateGame(gameId, randWord, ipAddr, location, "")
-		if err != nil {
-			log.Println(err)
-			continue
-		}
-		break
-	}
-	return map[string]string{"GameId": gameId, "Status": ""}
+func (g *GameAPI) StartGame(ipAddr, level, playerId, playerName string) string {
+	return g.createGame(g.getWord(level), ipAddr, g.getLocation(ipAddr), "", 1, playerId, playerName)
 }
 
-func (g *GameAPI) GetGame(gameId string) (map[string]interface{}, error) {
-	gameId = strings.ToUpper(gameId)
+// GameView is the game state exposed to the UI. The hidden word is only set
+// once it is safe to reveal.
+type GameView struct {
+	GameId         string
+	Status         string
+	Location       string
+	ChallengeId    string
+	ChallengeType  string
+	ChallengeTitle string
+	Round          int
+	NumRounds      int
+	Word           string
+	Score          string
+	Time           string
+	GuessCount     int
+	HintCount      int
+	Clues          []gamedb.GameClue
+	PlayerName     string
+	CreatedAgo     string
+}
+
+func (g *GameAPI) GetGame(gameId string) (*GameView, error) {
 	gs, err := g.db.CheckGameId(gameId)
 	if err != nil {
 		return nil, err
 	}
-
-	gameClues, err := g.db.GetClues(gameId)
+	clues, err := g.db.GetClues(gs.GameId)
 	if err != nil {
 		return nil, err
 	}
 
-	var hints int
-	guesses := len(gameClues)
-	for _, c := range gameClues {
+	hints := 0
+	for _, c := range clues {
 		if c.Hint {
 			hints++
 		}
 	}
-	guesses -= hints
-	location := g.getLocation(gs.Location)
+	guesses := len(clues) - hints
 
-	ret := map[string]interface{}{"Status": gs.Status,
-		"Clues": gameClues, "GameId": gameId, "Location": location,
-		"ChallengeId": gs.ChallengeId, "Time": gs.Duration.String, "GuessCount": guesses, "HintCount": hints}
-
-	ret["Word"] = ""
-	if gs.ChallengeId == "" && (gs.Status == "COMPLETED" || gs.Status == "RESIGNED") {
-		ret["Word"] = gs.Word
+	view := &GameView{
+		GameId:      gs.GameId,
+		Status:      gs.Status,
+		Location:    gs.Location,
+		ChallengeId: gs.ChallengeId,
+		Round:       gs.Round,
+		NumRounds:   1,
+		Clues:       clues,
+		GuessCount:  guesses,
+		HintCount:   hints,
+		PlayerName:  gs.PlayerName,
 	}
-
-	ret["Score"] = ""
-	if gs.Status == "COMPLETED" {
-		score := computeScore(guesses, hints, gs.CompletedSeconds)
-		scoreS := fmt.Sprintf("%0.2f", score)
-		ret["Score"] = scoreS
+	if gs.Duration.Valid {
+		view.Time = gs.Duration.String
 	}
-
-	return ret, nil
-}
-
-func (g *GameAPI) Submit(gameId string, clue string) (map[string]interface{}, error) {
-	gameStatus, err := g.db.CheckGameId(gameId)
-	if err != nil {
-		return nil, err
-	}
-
-	if gameStatus.Status != "STARTED" && gameStatus.Status != "CREATED" {
-		return nil, errors.New("Game already " + strings.ToLower(gameStatus.Status) + "...")
-	}
-
-	clue = strings.ToLower(clue)
-
-	if len(clue) != 4 {
-		return nil, errors.New(clue + ": guess should be four characters...")
-	}
-	if ok := checkUniqueChars(clue); !ok {
-		return nil, errors.New(clue + " has repeating characters...")
-	}
-	if !g.wordDict[clue] {
-		return nil, errors.New(clue + " is not in the game dictionary...")
-	}
-
-	bulls, cows := getClueStats(gameStatus.Word, clue)
-	err = g.db.InsertClue(gameId, clue, bulls, cows, false)
-	if err != nil {
-		return nil, err
-	}
-
-	if gameStatus.Status == "CREATED" {
-		g.db.UpdateStatus(gameId, gameStatus.Status, "STARTED", gameStatus.StartTime)
-		gameStatus, _ = g.db.CheckGameId(gameId)
-	}
-
-	if bulls == 4 {
-		g.db.UpdateStatus(gameId, gameStatus.Status, "COMPLETED", gameStatus.StartTime)
-		gameStatus.Status = "COMPLETED"
-		if err != nil {
-			return nil, err
+	if gs.CreateTime != nil {
+		age := time.Since(*gs.CreateTime).Round(time.Second)
+		view.CreatedAgo = age.String()
+		if age > 48*time.Hour {
+			view.CreatedAgo = fmt.Sprintf("%d days", int64(age)/int64(24*time.Hour))
 		}
 	}
 
-	return map[string]interface{}{
-		"Status": "", "GameId": gameId, "Clue": clue,
-		"Bulls": bulls, "Cows": cows}, nil
+	if gs.ChallengeId != "" {
+		if ch, err := g.db.GetChallenge(gs.ChallengeId); err == nil {
+			view.NumRounds = ch.NumRounds
+			view.ChallengeType = ch.Type
+			view.ChallengeTitle = ch.Title
+		}
+	}
+
+	// Solo words are revealed when the game ends; challenge words only to
+	// the player who found them, since others may still be playing
+	if gs.Status == "COMPLETED" || (gs.ChallengeId == "" && gs.Status == "RESIGNED") {
+		view.Word = gs.Word
+	}
+	if gs.Status == "COMPLETED" {
+		view.Score = fmt.Sprintf("%0.2f", ComputeScore(guesses, hints, gs.CompletedSeconds))
+	}
+
+	return view, nil
 }
 
-func (g *GameAPI) Hint(gameId string) (map[string]interface{}, error) {
+// setStatus updates a game status, logging failures.
+func (g *GameAPI) setStatus(gameId, status string, startTime *time.Time) {
+	if err := g.db.UpdateStatus(gameId, status, startTime); err != nil {
+		log.Printf("status update %s -> %s failed: %s", gameId, status, err)
+	}
+}
+
+// SubmitResult is returned from a guess submission.
+type SubmitResult struct {
+	Bulls, Cows int
+	Won         bool
+}
+
+func (g *GameAPI) Submit(gameId, clue string) (*SubmitResult, error) {
 	gameStatus, err := g.db.CheckGameId(gameId)
 	if err != nil {
 		return nil, err
 	}
-
 	if gameStatus.Status != "STARTED" && gameStatus.Status != "CREATED" {
-		return nil, errors.New("Game already " + strings.ToLower(gameStatus.Status) + "...")
+		return nil, errors.New("Game already " + strings.ToLower(gameStatus.Status))
 	}
 
-	gameClues, err := g.db.GetClues(gameId)
-	if err != nil {
-		return nil, err
+	clue = strings.ToLower(strings.TrimSpace(clue))
+	if len(clue) != 4 {
+		return nil, errors.New(strings.ToUpper(clue) + ": guess should be four letters")
+	}
+	if !checkUniqueChars(clue) {
+		return nil, errors.New(strings.ToUpper(clue) + " has repeating letters")
+	}
+	if !g.wordDict[clue] {
+		return nil, errors.New(strings.ToUpper(clue) + " is not in the game dictionary")
 	}
 
-	hint, err := g.getHint(*gameStatus, gameClues)
-	if err != nil {
-		return nil, err
-	}
-	bulls, cows := getClueStats(gameStatus.Word, hint)
-	err = g.db.InsertClue(gameId, hint, bulls, cows, true)
-	if err != nil {
+	bulls, cows := getClueStats(gameStatus.Word, clue)
+	if err := g.db.InsertClue(gameStatus.GameId, clue, bulls, cows, false); err != nil {
 		return nil, err
 	}
 
 	if gameStatus.Status == "CREATED" {
-		g.db.UpdateStatus(gameId, gameStatus.Status, "STARTED", gameStatus.StartTime)
-		gameStatus, _ = g.db.CheckGameId(gameId)
+		g.setStatus(gameStatus.GameId, "STARTED", gameStatus.StartTime)
+		gameStatus, _ = g.db.CheckGameId(gameStatus.GameId)
 	}
 
-	return map[string]interface{}{
-		"Status": "", "GameId": gameId, "Clue": hint,
-		"Bulls": bulls, "Cows": cows}, nil
+	won := bulls == 4
+	if won {
+		g.setStatus(gameStatus.GameId, "COMPLETED", gameStatus.StartTime)
+	}
+
+	if gameStatus.ChallengeId != "" {
+		g.notifyGuess(gameStatus, bulls, cows, won)
+	}
+
+	return &SubmitResult{Bulls: bulls, Cows: cows, Won: won}, nil
 }
 
-func (g *GameAPI) getHint(status gamedb.GameStatus, clues []gamedb.GameClue) (string, error) {
+// notifyGuess publishes wins and near-misses to the challenge activity feed.
+func (g *GameAPI) notifyGuess(gs *gamedb.GameStatus, bulls, cows int, won bool) {
+	numRounds := g.challengeRounds(gs.ChallengeId)
+	if won {
+		score := ""
+		if final, err := g.db.CheckGameId(gs.GameId); err == nil {
+			if counts, err := g.db.GetClueCounts(gs.GameId); err == nil {
+				score = fmt.Sprintf("%0.2f", ComputeScore(counts.Guesses, counts.Hints, final.CompletedSeconds))
+			}
+		}
+		g.publish(gs.ChallengeId, gs.PlayerId, completedMessage(gs.PlayerName, gs.Location, gs.Round, numRounds, score))
+	} else if bulls >= 3 || cows >= 4 {
+		g.publish(gs.ChallengeId, gs.PlayerId, bigGuessMessage(gs.PlayerName, gs.Location, bulls, cows))
+	}
+}
+
+func (g *GameAPI) Hint(gameId string) error {
+	gameStatus, err := g.db.CheckGameId(gameId)
+	if err != nil {
+		return err
+	}
+	if gameStatus.Status != "STARTED" && gameStatus.Status != "CREATED" {
+		return errors.New("Game already " + strings.ToLower(gameStatus.Status))
+	}
+
+	clues, err := g.db.GetClues(gameStatus.GameId)
+	if err != nil {
+		return err
+	}
+	hint, err := g.getHint(gameStatus, clues)
+	if err != nil {
+		return err
+	}
+
+	bulls, cows := getClueStats(gameStatus.Word, hint)
+	if err := g.db.InsertClue(gameStatus.GameId, hint, bulls, cows, true); err != nil {
+		return err
+	}
+	if gameStatus.Status == "CREATED" {
+		g.setStatus(gameStatus.GameId, "STARTED", gameStatus.StartTime)
+	}
+	return nil
+}
+
+// getHint finds an unused dictionary word that reveals exactly one letter
+// position of the hidden word.
+func (g *GameAPI) getHint(status *gamedb.GameStatus, clues []gamedb.GameClue) (string, error) {
 	word := status.Word
 	charPosition := make(map[rune]int)
 	for i, r := range word {
 		charPosition[r] = i
 	}
 
-	clueMap := make(map[string]bool)
+	used := make(map[string]bool, len(clues))
 	for _, c := range clues {
-		clueMap[c.Clue] = true
+		used[c.Clue] = true
 	}
 
 	indexes := []int{0, 1, 2, 3}
@@ -353,183 +470,233 @@ func (g *GameAPI) getHint(status gamedb.GameStatus, clues []gamedb.GameClue) (st
 		indexes[i], indexes[j] = indexes[j], indexes[i]
 	})
 	for _, i := range indexes {
-		letter := word[i]
-
-		for _, w := range g.words {
-			if w[i] == letter && !clueMap[w] {
-				bulls, cows := getClueStatsFromMap(charPosition, w)
-				if bulls == 1 && cows == 0 {
+		// Map iteration order is randomized, which shuffles the candidates
+		for w := range g.wordDict {
+			if w[i] == word[i] && !used[w] {
+				if bulls, cows := getClueStatsFromMap(charPosition, w); bulls == 1 && cows == 0 {
 					return w, nil
 				}
 			}
 		}
 	}
-
-	return "", errors.New("No suitable hint found")
+	return "", errors.New("no suitable hint found")
 }
 
-func (g *GameAPI) Resign(gameId string) (map[string]interface{}, error) {
+func (g *GameAPI) Resign(gameId string) error {
 	gameStatus, err := g.db.CheckGameId(gameId)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
 	if gameStatus.Status != "CREATED" && gameStatus.Status != "STARTED" {
-		return nil, errors.New("Game already " + strings.ToLower(gameStatus.Status) + "...")
+		return errors.New("Game already " + strings.ToLower(gameStatus.Status))
 	}
-	g.db.UpdateStatus(gameId, gameStatus.Status, "RESIGNED", gameStatus.StartTime)
+	if err := g.db.UpdateStatus(gameStatus.GameId, "RESIGNED", gameStatus.StartTime); err != nil {
+		return err
+	}
+
+	if gameStatus.ChallengeId != "" {
+		numRounds := g.challengeRounds(gameStatus.ChallengeId)
+		g.publish(gameStatus.ChallengeId, gameStatus.PlayerId,
+			resignMessage(gameStatus.PlayerName, gameStatus.Location, gameStatus.Round, numRounds))
+	}
+	return nil
+}
+
+// RoundResult is one player's result for one round of a challenge.
+type RoundResult struct {
+	Round   int
+	Status  string
+	Score   float64
+	ScoreS  string
+	Guesses int
+	Hints   int
+	Time    string
+	Active  bool
+}
+
+// PlayerRow is one player's aggregate standing in a challenge.
+type PlayerRow struct {
+	PlayerId   string
+	Name       string
+	Location   string
+	Rounds     []*RoundResult // indexed by round-1, nil if not played
+	Total      float64
+	TotalS     string
+	CurGuesses int // guesses in the player's current (latest) game
+	CurHints   int
+	RoundsDone int
+	Finished   bool // completed every round
+	DNF        bool // gave up on a round
+	IsLeader   bool
+}
+
+// Board is the live leaderboard for a challenge.
+type Board struct {
+	ChallengeId string
+	Type        string
+	Title       string
+	NumRounds   int
+	Players     []*PlayerRow
+	Events      []gamedb.ChallengeEvent
+	AnyFinished bool
+}
+
+func (g *GameAPI) GetBoard(challengeId string) (*Board, error) {
+	challengeId = strings.ToUpper(challengeId)
+	challenge, err := g.db.GetChallenge(challengeId)
+	if err != nil {
+		return nil, err
+	}
+	games, err := g.db.GetChallengeGameStatuses(challengeId)
+	if err != nil {
+		return nil, err
+	}
+	clueCounts, err := g.db.GetChallengeClueCounts(challengeId)
 	if err != nil {
 		return nil, err
 	}
 
-	gameClues, err := g.db.GetClues(gameId)
-	if err != nil {
-		return nil, err
-	}
-
-	statusText, shareText, _ := getStatusText(*gameStatus, gameClues, false, false)
-	infoText := getInfoText(*gameStatus)
-
-	return map[string]interface{}{
-		"Status": statusText, "ShareText": shareText, "GameInfo": infoText, "GameId": gameId}, nil
-}
-
-func getStatusText(status gamedb.GameStatus, gameClues []gamedb.GameClue, getIntermediateState, multiLine bool) (string, string, string) {
-	titleCaseStatus := strings.Title(strings.ToLower(status.Status))
-	durationString := ""
-	if status.Duration.Valid {
-		durationString = status.Duration.String
-	}
-
-	guesses := len(gameClues)
-	hints := 0
-	for _, c := range gameClues {
-		if c.Hint {
-			hints++
-		}
-	}
-	guesses -= hints
-	labelText, shareText, scoreS := "", "", ""
-	if status.ChallengeId != "" {
-		if getIntermediateState || (status.Status == "COMPLETED" || status.Status == "RESIGNED") {
-			if len(gameClues) == 0 {
-				labelText = fmt.Sprintf(`<b>%s</b>`, titleCaseStatus)
-			} else {
-				if multiLine {
-					labelText = fmt.Sprintf(`<b>%s</b><br>Guesses: %d<br>Hints: %d`,
-						titleCaseStatus, guesses, hints)
-					if durationString != "" {
-						labelText += fmt.Sprintf(`<br>Time: %s`,
-							durationString)
-					}
-				} else {
-					labelText = fmt.Sprintf(`%s, Guesses: %d Hints: %d`,
-						titleCaseStatus, guesses, hints)
-					if durationString != "" {
-						labelText += fmt.Sprintf(`, Time: %s`,
-							durationString)
-					}
-
-				}
+	players := map[string]*PlayerRow{}
+	order := []string{}
+	for _, gs := range games {
+		pid, name := gs.PlayerId, gs.PlayerName
+		if pid == "" {
+			// Games from before player identity existed
+			pid = gs.GameId
+			if name == "" {
+				name = "Guest"
 			}
 		}
-
-		if status.Status == "COMPLETED" {
-			shareText = fmt.Sprintf(`%s CowBull game https://cowbull.co/game?id=%s, word was "%s". Guesses: %d, Hints: %d, Time Taken: %s`,
-				titleCaseStatus, status.GameId, strings.ToUpper(status.Word), guesses, hints, durationString)
+		row, ok := players[pid]
+		if !ok {
+			row = &PlayerRow{
+				PlayerId: pid,
+				Name:     name,
+				Location: gs.Location,
+				Rounds:   make([]*RoundResult, challenge.NumRounds),
+			}
+			players[pid] = row
+			order = append(order, pid)
 		}
-	} else {
-		switch status.Status {
-		case "RESIGNED", "COMPLETED":
-			if len(gameClues) == 0 {
-				labelText = fmt.Sprintf(`%s, word was <a class="link link-primary"href="https://www.merriam-webster.com/dictionary/%s">%s</a>`,
-					titleCaseStatus, status.Word, status.Word)
-				shareText = fmt.Sprintf(`%s CowBull game https://cowbull.co/game?id=%s, word was "%s"`,
-					titleCaseStatus, status.GameId, strings.ToUpper(status.Word))
-			} else {
-				labelText = fmt.Sprintf(`%s, word was <a class="link link-primary"href="https://www.merriam-webster.com/dictionary/%s">%s</a><br> Guesses: %d, Hints: %d, Time Taken: %s`,
-					titleCaseStatus, status.Word, status.Word, guesses, hints, durationString)
-				shareText = fmt.Sprintf(`%s CowBull game https://cowbull.co/game?id=%s, word was "%s". Guesses: %d, Hints: %d, Time Taken: %s`,
-					titleCaseStatus, status.GameId, strings.ToUpper(status.Word), guesses, hints, durationString)
+		if name != "" {
+			row.Name = name
+		}
+
+		counts := clueCounts[gs.GameId]
+		// games are ordered by create time, so the last one is current
+		row.CurGuesses = counts.Guesses
+		row.CurHints = counts.Hints
+
+		if gs.Round < 1 || gs.Round > challenge.NumRounds {
+			continue
+		}
+		rr := &RoundResult{
+			Round:   gs.Round,
+			Status:  gs.Status,
+			Guesses: counts.Guesses,
+			Hints:   counts.Hints,
+			Active:  gs.Status == "CREATED" || gs.Status == "STARTED",
+		}
+		if gs.Duration.Valid {
+			rr.Time = gs.Duration.String
+		}
+		if gs.Status == "COMPLETED" {
+			rr.Score = ComputeScore(counts.Guesses, counts.Hints, gs.CompletedSeconds)
+			rr.ScoreS = fmt.Sprintf("%0.2f", rr.Score)
+		}
+		row.Rounds[gs.Round-1] = rr
+	}
+
+	board := &Board{
+		ChallengeId: challengeId,
+		Type:        challenge.Type,
+		Title:       challenge.Title,
+		NumRounds:   challenge.NumRounds,
+	}
+	for _, pid := range order {
+		row := players[pid]
+		for _, rr := range row.Rounds {
+			if rr == nil {
+				continue
+			}
+			if rr.Status == "COMPLETED" {
+				row.RoundsDone++
+				row.Total += rr.Score
+			}
+			if rr.Status == "RESIGNED" {
+				row.DNF = true
 			}
 		}
+		row.Finished = row.RoundsDone == challenge.NumRounds
+		board.AnyFinished = board.AnyFinished || row.Finished
+		row.TotalS = fmt.Sprintf("%0.2f", row.Total)
+		board.Players = append(board.Players, row)
 	}
 
-	if status.Status == "COMPLETED" {
-		score := computeScore(guesses, hints, status.CompletedSeconds)
-		if !multiLine {
-			labelText += fmt.Sprintf("<br>Score %0.2f", score)
-		}
-		shareText += fmt.Sprintf(". Score %0.2f", score)
-		scoreS = fmt.Sprintf("%0.2f", score)
+	// Rank by running total: stopping early keeps the score in play
+	sort.SliceStable(board.Players, func(i, j int) bool {
+		return board.Players[i].Total > board.Players[j].Total
+	})
+	if len(board.Players) > 0 && board.Players[0].Total > 0 {
+		board.Players[0].IsLeader = true
 	}
 
-	return labelText, shareText, scoreS
+	if events, err := g.db.GetEvents(challengeId, 20); err == nil {
+		board.Events = events
+	}
+	return board, nil
 }
 
-const SCORE_COMPUTE_MAX = 10000.0
-const MAX_SCORE = 10.0
-const MAX_TIME_PENALTY = 6000
+const (
+	scoreComputeMax = 10000.0
+	maxScore        = 10.0
+	maxTimePenalty  = 6000
+)
 
-func computeScore(clues, hints, completed_seconds int) float64 {
-	completed_seconds -= clues * 10
-	if completed_seconds < 0 {
-		completed_seconds = 0
-	}
+// ComputeScore maps guesses, hints and time taken to a 1..10 score.
+func ComputeScore(guesses, hints, completedSeconds int) float64 {
+	completedSeconds = max(completedSeconds-guesses*10, 0)
 
-	penalty := completed_seconds * 5
-	if penalty > MAX_TIME_PENALTY {
-		penalty = MAX_TIME_PENALTY
-	}
-	penalty += (clues - 1) * 300
+	penalty := min(completedSeconds*5, maxTimePenalty)
+	penalty += (guesses - 1) * 300
 	penalty += hints * 800
-	score := SCORE_COMPUTE_MAX - float64(penalty)
 
-	scoreF := float64(score) / float64(SCORE_COMPUTE_MAX/MAX_SCORE)
-	if scoreF < 1 {
-		scoreF = 1
-	} else if scoreF > MAX_SCORE {
-		scoreF = MAX_SCORE
-	}
-	return scoreF
+	score := (scoreComputeMax - float64(penalty)) / (scoreComputeMax / maxScore)
+	return min(max(score, 1), maxScore)
 }
 
-func getInfoText(status gamedb.GameStatus) string {
-	text := ""
-	age := time.Since(*status.CreateTime).Round(time.Second)
-	ageStr := age.String()
-	if age > 48*time.Hour {
-		days := int64(age) / int64(24*time.Hour)
-		ageStr = fmt.Sprintf("%d days", days)
-	}
-
-	if status.ChallengeId != "" {
-		text += fmt.Sprintf(`Challenge <a class="link link-primary" href=challenge?id=%s>%s</a>,`, status.ChallengeId, status.ChallengeId)
-	}
-	text += fmt.Sprintf(` Game <a class="link link-primary" href=game?id=%s>%s</a>,`, status.GameId, status.GameId)
-	text += fmt.Sprintf(" created %s ago", ageStr)
-	return text
+func (g *GameAPI) GetStats() (map[string]any, error) {
+	return g.db.GetStats()
 }
 
-func (g *GameAPI) GetStats() (map[string]interface{}, error) {
-	stats, err := g.db.GetStats()
-	if err != nil {
-		return nil, err
-	}
-	return stats, nil
-}
-
+// CleanupDB periodically deletes old games based on their status, until
+// Close is called.
 func (g *GameAPI) CleanupDB() {
+	ticker := time.NewTicker(time.Hour)
+	defer ticker.Stop()
 	for {
-		g.db.Cleanup(gamedb.Created, CleanupUnstarted)
-		g.db.Cleanup(gamedb.Started, CleanupStarted)
-		g.db.Cleanup(gamedb.Completed, CleanupCompleted)
-		g.db.Cleanup(gamedb.Resigned, CleanupResigned)
-
-		time.Sleep(time.Hour)
+		for status, age := range map[gamedb.Status]time.Duration{
+			gamedb.Created:   CleanupUnstarted,
+			gamedb.Started:   CleanupStarted,
+			gamedb.Completed: CleanupCompleted,
+			gamedb.Resigned:  CleanupResigned,
+		} {
+			if err := g.db.Cleanup(status, age); err != nil {
+				log.Printf("cleanup %s failed: %s", status, err)
+			}
+		}
+		select {
+		case <-g.stop:
+			return
+		case <-ticker.C:
+		}
 	}
 }
 
 func (g *GameAPI) Close() {
+	close(g.stop)
+	if g.ipLookup != nil {
+		g.ipLookup.Close()
+	}
 	g.db.Close()
 }

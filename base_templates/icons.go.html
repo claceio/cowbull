@@ -1,0 +1,234 @@
+{{/* Static SVG icons, stroke-based so they follow the theme via
+  currentColor. Each define takes the tailwind size/color classes as its
+  context, defaulting to w-4 h-4:
+  {{ template "icon_bull" "w-5 h-5 text-primary" }}
+*/}}
+
+{{ define "icon_svg_open" }}
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+    class="inline-block align-[-0.185em] shrink-0 {{ if . }}{{ . }}{{ else }}w-4 h-4{{ end }}">
+{{ end }}
+
+{{/* icon_bull: three concentric bullseye rings over a longhorn; the horn
+  is black in light mode and white in dark mode (.cb-horn)
+*/}}
+{{ define "icon_bull" }}
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    aria-hidden="true"
+    class="inline-block align-[-0.185em] shrink-0 {{ if . }}{{ . }}{{ else }}w-4 h-4{{ end }}">
+    <path
+      class="cb-horn"
+      d="M12.8 11c2.9.4 5.4-.3 7.1-1.8 1.1-1 1.8-2.3 1.9-3.7-.6 1.2-1.5 2.2-2.7 2.9-1.7 1-3.9 1.3-6.3 1.1Z" />
+    <path
+      class="cb-horn"
+      d="M11.2 11c-2.9.4-5.4-.3-7.1-1.8-1.1-1-1.8-2.3-1.9-3.7.6 1.2 1.5 2.2 2.7 2.9 1.7 1 3.9 1.3 6.3 1.1Z" />
+    <path
+      class="cb-horn"
+      d="M10.7 9.8c.9-.2 1.7-.2 2.6 0 .3 2.1.1 3.9-.5 5.2-.2.5-.5.8-.8.8s-.6-.3-.8-.8c-.6-1.3-.8-3.1-.5-5.2Z" />
+    <circle cx="12" cy="12" r="11" stroke="#ef4444" stroke-width="0.9" />
+    <circle cx="12" cy="12" r="8.4" stroke="#ef4444" stroke-width="0.8" />
+    <circle cx="12" cy="12" r="5.8" stroke="#ef4444" stroke-width="0.7" />
+  </svg>
+{{ end }}
+
+{{/* icon_cow: front-facing cow head silhouette */}}
+{{ define "icon_cow" }}
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    aria-hidden="true"
+    class="inline-block align-[-0.185em] shrink-0 {{ if . }}{{ . }}{{ else }}w-4 h-4{{ end }}">
+    <path
+      fill-rule="evenodd"
+      d="M8.8 3.4c.3.8.9 1.4 1.7 1.7a7 7 0 0 1 3 0c.8-.3 1.4-.9 1.7-1.7.7.5 1.1 1.3 1.1 2.2v.4c1.5.1 3 .5 4.4 1.3.7.4 1.2 1.1 1.2 2 0 1.2-1 2.2-2.2 2.2h-1.1c.2 1 .2 2 .1 3-.1.9-.5 1.7-1.2 2.3-.9.8-1.6 1.9-1.9 3.1-.2.9-1 1.5-1.9 1.5h-3.4c-.9 0-1.7-.6-1.9-1.5-.3-1.2-1-2.3-1.9-3.1-.7-.6-1.1-1.4-1.2-2.3-.1-1-.1-2 .1-3H4.3C3.1 11.5 2.1 10.5 2.1 9.3c0-.9.5-1.6 1.2-2 1.4-.8 2.9-1.2 4.4-1.3v-.4c0-.9.4-1.7 1.1-2.2Z M9.7 16.4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z M14.3 16.4a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z" />
+  </svg>
+{{ end }}
+
+{{ define "icon_crown" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.28 3.67a1 1 0 0 0 1.51-.3z" />
+  </svg>
+{{ end }}
+
+{{ define "icon_trophy" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+  <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+  <path d="M4 22h16" />
+  <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+  <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+  <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+  </svg>
+{{ end }}
+
+{{ define "icon_flag" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+  <line x1="4" x2="4" y1="22" y2="15" />
+  </svg>
+{{ end }}
+
+{{ define "icon_bulb" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+  <path d="M9 18h6" />
+  <path d="M10 22h4" />
+  </svg>
+{{ end }}
+
+{{ define "icon_user" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+  <circle cx="12" cy="7" r="4" />
+  </svg>
+{{ end }}
+
+{{ define "icon_users" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+  <circle cx="9" cy="7" r="4" />
+  <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+{{ end }}
+
+{{ define "icon_moon" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+  </svg>
+{{ end }}
+
+{{ define "icon_help" }}
+  {{ template "icon_svg_open" . }}
+  <circle cx="12" cy="12" r="10" />
+  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+  <path d="M12 17h.01" />
+  </svg>
+{{ end }}
+
+{{ define "icon_key" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="M2.59 17.41A2 2 0 0 0 2 18.83V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.17a2 2 0 0 0 1.42-.59l.81-.81a6.5 6.5 0 1 0-4-4z" />
+  <circle cx="16.5" cy="7.5" r="0.5" fill="currentColor" />
+  </svg>
+{{ end }}
+
+{{ define "icon_megaphone" }}
+  {{ template "icon_svg_open" . }}
+  <path d="m3 11 18-5v12L3 14v-3z" />
+  <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+  </svg>
+{{ end }}
+
+{{ define "icon_medal" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15" />
+  <path d="M11 12 5.12 2.2" />
+  <path d="m13 12 5.88-9.8" />
+  <path d="M8 7h8" />
+  <circle cx="12" cy="17" r="5" />
+  <path d="M12 18v-2h-.5" />
+  </svg>
+{{ end }}
+
+{{ define "icon_link" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+  </svg>
+{{ end }}
+
+{{ define "icon_play" }}
+  {{ template "icon_svg_open" . }}
+  <polygon points="6 3 20 12 6 21 6 3" />
+  </svg>
+{{ end }}
+
+{{ define "icon_home" }}
+  {{ template "icon_svg_open" . }}
+  <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  <polyline points="9 22 9 12 15 12 15 22" />
+  </svg>
+{{ end }}
+
+{{ define "icon_check" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M20 6 9 17l-5-5" />
+  </svg>
+{{ end }}
+
+{{ define "icon_bell" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+  <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </svg>
+{{ end }}
+
+{{ define "icon_refresh" }}
+  {{ template "icon_svg_open" . }}
+  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+  <path d="M3 3v5h5" />
+  </svg>
+{{ end }}
+
+{{ define "icon_alert" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 20h16a2 2 0 0 0 1.73-2Z" />
+  <path d="M12 9v4" />
+  <path d="M12 17h.01" />
+  </svg>
+{{ end }}
+
+{{ define "icon_type" }}
+  {{ template "icon_svg_open" . }}
+  <polyline points="4 7 4 4 20 4 20 7" />
+  <line x1="9" x2="15" y1="20" y2="20" />
+  <line x1="12" x2="12" y1="4" y2="20" />
+  </svg>
+{{ end }}
+
+{{ define "icon_sparkles" }}
+  {{ template "icon_svg_open" . }}
+  <path
+    d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0l1.58 6.14a2 2 0 0 0 1.44 1.44l6.14 1.58a.5.5 0 0 1 0 .96l-6.14 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0z" />
+  <path d="M20 3v4" />
+  <path d="M22 5h-4" />
+  </svg>
+{{ end }}
+
+{{ define "icon_swords" }}
+  {{ template "icon_svg_open" . }}
+  <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
+  <line x1="13" x2="19" y1="19" y2="13" />
+  <line x1="16" x2="20" y1="16" y2="20" />
+  <line x1="19" x2="21" y1="21" y2="19" />
+  <polyline points="14.5 4 20 4 20 9.5" />
+  <line x1="5" x2="9" y1="14" y2="18" />
+  <line x1="7" x2="4" y1="17" y2="20" />
+  <line x1="3" x2="5" y1="19" y2="21" />
+  </svg>
+{{ end }}
+
+{{ define "icon_copy" }}
+  {{ template "icon_svg_open" . }}
+  <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+  <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+  </svg>
+{{ end }}
