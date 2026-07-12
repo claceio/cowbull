@@ -3,6 +3,3 @@ db.sqlite-*
 cowbull
 *.swp
 *.swo
-config_gen.lock
-openrun_gen.go.html
-static/gen/
