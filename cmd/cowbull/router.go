@@ -263,6 +263,10 @@ var toastTemplate = template.Must(template.New("toast").Parse(
 	`<div class="alert shadow-lg bg-base-100 text-sm" _="on load wait 6s then transition my opacity to 0 over 500ms then remove me">` +
 		toastBellSvg + `<span>{{.}}</span></div>`))
 
+// flashTemplate is the slim 2-second banner shown on the game screen
+var flashTemplate = template.Must(template.New("flash").Parse(
+	`<div class="cb-flash" _="on load wait 2s then transition my opacity to 0 over 300ms then remove me">{{.}}</div>`))
+
 func (h *APIHandler) events(w http.ResponseWriter, r *http.Request) {
 	challengeId := strings.ToUpper(r.PathValue("id"))
 	if _, err := h.api.GetChallenge(challengeId); err != nil {
@@ -311,6 +315,10 @@ func (h *APIHandler) events(w http.ResponseWriter, r *http.Request) {
 				var sb strings.Builder
 				if err := toastTemplate.Execute(&sb, ev.Data); err == nil {
 					fmt.Fprintf(w, "event: activity\ndata: %s\n\n", strings.ReplaceAll(sb.String(), "\n", " "))
+				}
+				sb.Reset()
+				if err := flashTemplate.Execute(&sb, ev.Data); err == nil {
+					fmt.Fprintf(w, "event: flash\ndata: %s\n\n", strings.ReplaceAll(sb.String(), "\n", " "))
 				}
 			}
 			// Everyone refreshes the board, including the origin player

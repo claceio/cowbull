@@ -1,137 +1,137 @@
 {{ define "content" }}
 
+  <div class="card bg-base-100 shadow-md">
+    <div class="card-body p-5 md:p-7 prose prose-sm max-w-none">
+      <h2 class="flex items-center gap-2">
+        {{ template "icon_cow" "w-6 h-6 text-primary" }} How to play
+      </h2>
+      <ul>
+        <li>A hidden word has <b>four letters, no repeats</b>.</li>
+        <li>
+          Enter guesses - valid English words, four letters, no repeated
+          letters.
+        </li>
+        <li>
+          <b>{{ template "icon_bull" "w-4 h-4" }} Bull</b> - a letter is in the
+          <i>same position</i> in your guess and the hidden word. Bulls-eye!
+        </li>
+        <li>
+          <b>{{ template "icon_cow" "w-4 h-4" }} Cow</b> - a letter is in the
+          hidden word but at a <i>different position</i>.
+        </li>
+        <li>Four bulls and the word is yours.</li>
+      </ul>
 
-      <div class="card bg-base-100 shadow-md">
-        <div class="card-body p-5 md:p-7 prose prose-sm max-w-none">
-          <h2 class="flex items-center gap-2">{{ template "icon_cow" "w-6 h-6 text-primary" }} How to play</h2>
-          <ul>
-            <li>A hidden word has <b>four letters, no repeats</b>.</li>
-            <li>
-              Enter guesses — valid English words, four letters, no repeated
-              letters.
-            </li>
-            <li>
-              <b>{{ template "icon_bull" "w-4 h-4" }} Bull</b> — a letter is in the <i>same position</i> in your
-              guess and the hidden word. Bulls-eye!
-            </li>
-            <li>
-              <b>{{ template "icon_cow" "w-4 h-4" }} Cow</b> — a letter is in the hidden word but at a
-              <i>different position</i>.
-            </li>
-            <li>Four bulls and the word is yours.</li>
-          </ul>
+      <h3>Example</h3>
+      <p>If the hidden word is <b>WORK</b>:</p>
+      <ul>
+        <li><b>ROSE</b> → 1 bull (<b>O</b>), 1 cow (<b>R</b>)</li>
+        <li><b>CORD</b> → 2 bulls (<b>O</b>, <b>R</b>), 0 cows</li>
+        <li><b>SEND</b> → no match, four letters eliminated</li>
+        <li><b>WORK</b> → 4 bulls, game over</li>
+      </ul>
 
-          <h3>Example</h3>
-          <p>If the hidden word is <b>WORK</b>:</p>
-          <ul>
-            <li><b>ROSE</b> → 1 bull (<b>O</b>), 1 cow (<b>R</b>)</li>
-            <li><b>CORD</b> → 2 bulls (<b>O</b>, <b>R</b>), 0 cows</li>
-            <li><b>SEND</b> → no match, four letters eliminated</li>
-            <li><b>WORK</b> → 4 bulls, game over</li>
-          </ul>
+      <h3>Scoring</h3>
+      <p>
+        Every game starts at <b>10 points</b> and loses points for the effort it
+        took:
+      </p>
+      <ul>
+        <li>Each guess after the first costs <b>0.3</b>.</li>
+        <li>Each hint costs <b>0.8</b> - use them as a last resort.</li>
+        <li>
+          Time costs <b>0.05 per second</b> (capped at 6 points), with a free
+          10-second allowance per guess. The clock starts at your first guess.
+        </li>
+        <li>A win never scores below <b>1</b>.</li>
+      </ul>
 
-          <h3>Scoring</h3>
-          <p>
-            Every game starts at <b>10 points</b> and loses points for the
-            effort it took:
-          </p>
-          <ul>
-            <li>Each guess after the first costs <b>0.3</b>.</li>
-            <li>Each hint costs <b>0.8</b> — use them as a last resort.</li>
-            <li>
-              Time costs <b>0.05 per second</b> (capped at 6 points), with a
-              free 10-second allowance per guess. The clock starts at your
-              first guess.
-            </li>
-            <li>A win never scores below <b>1</b>.</li>
-          </ul>
+      <h4>Try it</h4>
+      <form
+        hx-post="{{ .AppPath }}/help/score"
+        hx-target="#score-result"
+        hx-swap="innerHTML"
+        class="not-prose flex flex-wrap items-end gap-2">
+        <label class="form-control">
+          <span class="label-text text-xs">Guesses</span>
+          <input
+            type="number"
+            name="guesses"
+            value="5"
+            min="1"
+            max="99"
+            required
+            class="input input-bordered input-sm w-20" />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-xs">Hints</span>
+          <input
+            type="number"
+            name="hints"
+            value="0"
+            min="0"
+            max="99"
+            required
+            class="input input-bordered input-sm w-20" />
+        </label>
+        <label class="form-control">
+          <span class="label-text text-xs">Seconds</span>
+          <input
+            type="number"
+            name="seconds"
+            value="120"
+            min="0"
+            max="99999"
+            required
+            class="input input-bordered input-sm w-24" />
+        </label>
+        <button type="submit" class="btn btn-primary btn-sm">
+          Check score
+        </button>
+      </form>
+      <div id="score-result" class="not-prose mt-3"></div>
 
-          <h4>Try it</h4>
-          <form
-            hx-post="{{ .AppPath }}/help/score"
-            hx-target="#score-result"
-            hx-swap="innerHTML"
-            class="not-prose flex flex-wrap items-end gap-2">
-            <label class="form-control">
-              <span class="label-text text-xs">Guesses</span>
-              <input
-                type="number"
-                name="guesses"
-                value="5"
-                min="1"
-                max="99"
-                required
-                class="input input-bordered input-sm w-20" />
-            </label>
-            <label class="form-control">
-              <span class="label-text text-xs">Hints</span>
-              <input
-                type="number"
-                name="hints"
-                value="0"
-                min="0"
-                max="99"
-                required
-                class="input input-bordered input-sm w-20" />
-            </label>
-            <label class="form-control">
-              <span class="label-text text-xs">Seconds</span>
-              <input
-                type="number"
-                name="seconds"
-                value="120"
-                min="0"
-                max="99999"
-                required
-                class="input input-bordered input-sm w-24" />
-            </label>
-            <button type="submit" class="btn btn-primary btn-sm">
-              Check score
-            </button>
-          </form>
-          <div id="score-result" class="not-prose mt-3"></div>
+      <h3>Playing with friends</h3>
+      <ul>
+        <li>
+          Set up a game with 1–8 rounds and share the 4-letter code - everyone
+          gets the same words in the same order.
+        </li>
+        <li>
+          Set your <b>name</b> (button at the top right) so friends can spot you
+          on the board. It is saved on this device only - no account needed.
+          Skip it and you get a random name like PAAEE.
+        </li>
+        <li>
+          Live standings and activity: you'll see when someone joins, gets 2+
+          bulls, or finishes.
+        </li>
+      </ul>
 
-          <h3>Playing with friends</h3>
-          <ul>
-            <li>
-              Set up a game with 1–8 rounds and share the 4-letter code —
-              everyone gets the same words in the same order.
-            </li>
-            <li>
-              Set your <b>name</b> (button at the top right) so friends can spot you
-              on the board. It is saved on this device only — no account
-              needed. Skip it and you get a random name like PAAEE.
-            </li>
-            <li>
-              Live standings and activity: you'll see when someone joins, gets
-              3+ bulls, or finishes.
-            </li>
-          </ul>
+      <h3>Tournament</h3>
+      <ul>
+        <li>
+          A single round is a quick match; more rounds make a tournament. Give
+          the game a name when setting it up.
+        </li>
+        <li>
+          Your scores across rounds add up as a <b>running tally</b> - highest
+          total wins.
+        </li>
+        <li>
+          Stopping early marks you DNF, but your total keeps counting: a strong
+          early score can still win the tournament.
+        </li>
+      </ul>
 
-          <h3>Tournament</h3>
-          <ul>
-            <li>
-              A single round is a quick match; more rounds make a tournament.
-              Give the game a name when setting it up.
-            </li>
-            <li>
-              Your scores across rounds add up as a <b>running tally</b> —
-              highest total wins.
-            </li>
-            <li>
-              Stopping early marks you DNF, but your total keeps counting: a
-              strong early score can still win the tournament.
-            </li>
-          </ul>
-
-          <h3>About</h3>
-          <p>
-            <a class="link" href="mailto:cowbullcontact@gmail.com"
-              >cowbullcontact@gmail.com</a
-            >
-          </p>
-        </div>
-      </div>
+      <h3>About</h3>
+      <p>
+        <a class="link" href="mailto:cowbullcontact@gmail.com"
+          >cowbullcontact@gmail.com</a
+        >
+      </p>
+    </div>
+  </div>
 {{ end }}
 
 {{ template "page" . }}

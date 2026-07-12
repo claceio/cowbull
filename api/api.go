@@ -275,9 +275,7 @@ func (g *GameAPI) StartGame(ipAddr, level, playerId, playerName string) string {
 type GameView struct {
 	GameId         string
 	Status         string
-	Location       string
 	ChallengeId    string
-	ChallengeType  string
 	ChallengeTitle string
 	Round          int
 	NumRounds      int
@@ -287,7 +285,6 @@ type GameView struct {
 	GuessCount     int
 	HintCount      int
 	Clues          []gamedb.GameClue
-	PlayerName     string
 	CreatedAgo     string
 }
 
@@ -312,14 +309,12 @@ func (g *GameAPI) GetGame(gameId string) (*GameView, error) {
 	view := &GameView{
 		GameId:      gs.GameId,
 		Status:      gs.Status,
-		Location:    gs.Location,
 		ChallengeId: gs.ChallengeId,
 		Round:       gs.Round,
 		NumRounds:   1,
 		Clues:       clues,
 		GuessCount:  guesses,
 		HintCount:   hints,
-		PlayerName:  gs.PlayerName,
 	}
 	if gs.Duration.Valid {
 		view.Time = gs.Duration.String
@@ -335,7 +330,6 @@ func (g *GameAPI) GetGame(gameId string) (*GameView, error) {
 	if gs.ChallengeId != "" {
 		if ch, err := g.db.GetChallenge(gs.ChallengeId); err == nil {
 			view.NumRounds = ch.NumRounds
-			view.ChallengeType = ch.Type
 			view.ChallengeTitle = ch.Title
 		}
 	}
@@ -418,7 +412,7 @@ func (g *GameAPI) notifyGuess(gs *gamedb.GameStatus, bulls, cows int, won bool) 
 			}
 		}
 		g.publish(gs.ChallengeId, gs.PlayerId, completedMessage(gs.PlayerName, gs.Location, gs.Round, numRounds, score))
-	} else if bulls >= 3 || cows >= 4 {
+	} else if bulls >= 2 || cows >= 3 {
 		g.publish(gs.ChallengeId, gs.PlayerId, bigGuessMessage(gs.PlayerName, gs.Location, bulls, cows))
 	}
 }
@@ -511,7 +505,6 @@ type RoundResult struct {
 	Guesses int
 	Hints   int
 	Time    string
-	Active  bool
 }
 
 // PlayerRow is one player's aggregate standing in a challenge.
@@ -538,7 +531,6 @@ type Board struct {
 	NumRounds   int
 	Players     []*PlayerRow
 	Events      []gamedb.ChallengeEvent
-	AnyFinished bool
 }
 
 func (g *GameAPI) GetBoard(challengeId string) (*Board, error) {
@@ -595,7 +587,6 @@ func (g *GameAPI) GetBoard(challengeId string) (*Board, error) {
 			Status:  gs.Status,
 			Guesses: counts.Guesses,
 			Hints:   counts.Hints,
-			Active:  gs.Status == "CREATED" || gs.Status == "STARTED",
 		}
 		if gs.Duration.Valid {
 			rr.Time = gs.Duration.String
@@ -628,7 +619,6 @@ func (g *GameAPI) GetBoard(challengeId string) (*Board, error) {
 			}
 		}
 		row.Finished = row.RoundsDone == challenge.NumRounds
-		board.AnyFinished = board.AnyFinished || row.Finished
 		row.TotalS = fmt.Sprintf("%0.2f", row.Total)
 		board.Players = append(board.Players, row)
 	}

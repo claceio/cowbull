@@ -5,11 +5,15 @@
         <div
           hx-ext="sse"
           sse-connect="{{ .AppPath }}/api/challenge/{{ $g.ChallengeId }}/events">
+          {{/* latest activity flashes briefly without moving the layout
+            or stealing focus; each event replaces the previous one
+          */}}
+          <div id="flash" aria-live="polite"></div>
           <div
             class="hidden"
-            sse-swap="activity"
-            hx-target="#toasts"
-            hx-swap="afterbegin"></div>
+            sse-swap="flash"
+            hx-target="#flash"
+            hx-swap="innerHTML"></div>
 
           <div class="mt-2 mb-5">
             {{ if $g.ChallengeTitle }}
