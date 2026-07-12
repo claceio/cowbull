@@ -259,9 +259,9 @@ func (g *GameAPI) StartChallengeGame(challengeId, ipAddr, playerId, playerName s
 	gameId := g.createGame(word, ipAddr, location, challengeId, round, playerId, playerName)
 
 	if round == 1 {
-		g.publish(challengeId, playerId, joinMessage(playerName, location))
+		g.publish(challengeId, playerId, joinMessage(playerName))
 	} else {
-		g.publish(challengeId, playerId, roundStartMessage(playerName, location, round, challenge.NumRounds))
+		g.publish(challengeId, playerId, roundStartMessage(playerName, round, challenge.NumRounds))
 	}
 	return gameId, nil
 }
@@ -411,9 +411,9 @@ func (g *GameAPI) notifyGuess(gs *gamedb.GameStatus, bulls, cows int, won bool) 
 				score = fmt.Sprintf("%0.2f", ComputeScore(counts.Guesses, counts.Hints, final.CompletedSeconds))
 			}
 		}
-		g.publish(gs.ChallengeId, gs.PlayerId, completedMessage(gs.PlayerName, gs.Location, gs.Round, numRounds, score))
+		g.publish(gs.ChallengeId, gs.PlayerId, completedMessage(gs.PlayerName, gs.Round, numRounds, score))
 	} else if bulls >= 2 || cows >= 3 {
-		g.publish(gs.ChallengeId, gs.PlayerId, bigGuessMessage(gs.PlayerName, gs.Location, bulls, cows))
+		g.publish(gs.ChallengeId, gs.PlayerId, bigGuessMessage(gs.PlayerName, bulls, cows))
 	}
 }
 
@@ -491,7 +491,7 @@ func (g *GameAPI) Resign(gameId string) error {
 	if gameStatus.ChallengeId != "" {
 		numRounds := g.challengeRounds(gameStatus.ChallengeId)
 		g.publish(gameStatus.ChallengeId, gameStatus.PlayerId,
-			resignMessage(gameStatus.PlayerName, gameStatus.Location, gameStatus.Round, numRounds))
+			resignMessage(gameStatus.PlayerName, gameStatus.Round, numRounds))
 	}
 	return nil
 }

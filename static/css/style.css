@@ -149,3 +149,47 @@ input.level-pick:checked {
   border-color: color-mix(in oklab, var(--color-base-content) 10%, var(--color-base-100));
   color: var(--color-base-content);
 }
+
+/* --- htmx spinner: hidden entirely until a request is in flight, so
+   button labels stay centered --- */
+.htmx-indicator {
+  display: none;
+}
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: inline-block;
+}
+
+/* --- brand wordmark: Lilita One (OFL), self-hosted --- */
+@font-face {
+  font-family: "Lilita One";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../fonts/lilita-one.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Baloo 2";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("../fonts/baloo2.woff2") format("woff2");
+}
+
+/* Baloo 2 for body text (rounded but built for reading); Lilita One for
+   titles. Guessed words and codes keep monospace (font-mono wins). */
+body {
+  font-family: "Baloo 2", ui-rounded, system-ui, sans-serif;
+}
+h1,
+h2,
+h3,
+.card-title,
+.stat-value,
+.cb-wordmark {
+  font-family: "Lilita One", ui-rounded, system-ui, sans-serif;
+  font-weight: 400;
+}
+.cb-wordmark {
+  letter-spacing: 0.01em;
+}

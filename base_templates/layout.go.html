@@ -91,8 +91,8 @@
           src="{{ static "images/cowbull.svg" }}"
           alt="CowBull"
           class="w-10 h-10 md:w-12 md:h-12" />
-        <span class="text-2xl md:text-3xl font-black tracking-tight"
-          >CowBull</span
+        <span class="cb-wordmark text-3xl md:text-4xl"
+          >Cow<span class="text-primary">Bull</span></span
         >
       </a>
     </div>
@@ -264,13 +264,13 @@
   </div>
 {{ end }}
 
-{{/* player_label renders "Name (Location)" with the location subdued,
-  when known. Context: a Board player row
+{{/* player_label renders the player name, with the location appended in
+  the lobby view. Context: dict with Row (board player) and ShowLoc
 */}}
 {{ define "player_label" }}
-  {{- .Name -}}
-  {{- if and .Location (ne .Location "Unknown") }}
-    <span class="text-xs opacity-50 font-normal">({{ .Location }})</span>
+  {{- .Row.Name -}}
+  {{- if and .ShowLoc .Row.Location (ne .Row.Location "Unknown") }}
+    <span class="text-xs opacity-50 font-normal">({{ .Row.Location }})</span>
   {{- end -}}
 {{ end }}
 
@@ -280,6 +280,7 @@
 */}}
 {{ define "board_card" }}
   {{ $b := .Data.Board }}
+  {{ $showLoc := .Data.ShowLoc }}
   {{ $rounds := int $b.NumRounds }}
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-5 md:p-6 space-y-2">
@@ -312,7 +313,7 @@
                     {{ if .IsLeader }}
                       {{ template "icon_crown" "w-4 h-4 text-primary" }}
                     {{ end }}
-                    {{ template "player_label" . }}
+                    {{ template "player_label" (dict "Row" . "ShowLoc" $showLoc) }}
                   </td>
                   {{ if $r }}
                     <td class="text-right">{{ int $r.Guesses }}</td>
@@ -358,7 +359,7 @@
                     {{ if .IsLeader }}
                       {{ template "icon_crown" "w-4 h-4 text-primary" }}
                     {{ end }}
-                    {{ template "player_label" . }}
+                    {{ template "player_label" (dict "Row" . "ShowLoc" $showLoc) }}
                     <div
                       class="text-xs opacity-60 font-normal whitespace-nowrap">
                       {{ int .CurGuesses }} guesses
@@ -529,6 +530,7 @@
           <input
             name="guess"
             type="text"
+            value="{{ with .Data.Prefill }}{{ . }}{{ end }}"
             placeholder="WORD"
             minlength="4"
             maxlength="4"
@@ -545,7 +547,7 @@
           <button type="submit" class="btn btn-primary btn-lg">
             <span
               class="loading loading-spinner loading-xs htmx-indicator"></span>
-            Guess
+            Go
           </button>
         </form>
 
