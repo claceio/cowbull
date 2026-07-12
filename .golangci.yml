@@ -1,0 +1,17 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      # Writes to http.ResponseWriter and Close-on-read have no useful
+      # error handling path here
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (fs.File).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.DB).Close
+        - fmt.Fprint
+        - fmt.Fprintf
+        - (*encoding/json.Encoder).Encode
+        - (*github.com/oschwald/geoip2-golang.Reader).Close

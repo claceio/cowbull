@@ -1,0 +1,19 @@
+{{ define "content" }}
+
+
+      <div class="card bg-base-100 shadow-md mt-8 text-center">
+        <div class="card-body items-center p-7">
+          <img
+            src="{{ static "images/cowbull.svg" }}"
+            alt=""
+            class="w-16 h-16 opacity-80" />
+          <h2 class="text-xl font-black">Moo... nothing here</h2>
+          <p class="text-sm opacity-70">{{ .Data.Message }}</p>
+          <a href="{{ .AppPath }}/" class="btn btn-primary mt-2"
+            >{{ template "icon_home" "w-4 h-4" }} Back home</a
+          >
+        </div>
+      </div>
+{{ end }}
+
+{{ template "page" . }}

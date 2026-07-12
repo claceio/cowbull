@@ -1,0 +1,14 @@
+.git
+db.sqlite
+db.sqlite-*
+cowbull
+*.swp
+*.swo
+*.go.html
+base_templates/
+static/
+app.star
+params.star
+config_gen.lock
+Containerfile
+.dockerignore
