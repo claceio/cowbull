@@ -100,13 +100,17 @@ func sanitizeId(id string) string {
 }
 
 func (h *APIHandler) createGame(w http.ResponseWriter, r *http.Request) {
-	gameId := h.api.StartGame(getUserIP(r), r.FormValue("level"),
+	gameId, err := h.api.StartGame(getUserIP(r), r.FormValue("level"),
 		sanitizeId(r.FormValue("player_id")), playerName(r))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"GameId": gameId})
 }
 
 func (h *APIHandler) getGame(w http.ResponseWriter, r *http.Request) {
-	view, err := h.api.GetGame(r.PathValue("id"))
+	view, err := h.api.GetGame(r.PathValue("id"), sanitizeId(r.FormValue("player_id")))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -119,7 +123,7 @@ func (h *APIHandler) getGame(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) submit(w http.ResponseWriter, r *http.Request) {
-	res, err := h.api.Submit(r.PathValue("id"), r.FormValue("guess"))
+	res, err := h.api.Submit(r.PathValue("id"), sanitizeId(r.FormValue("player_id")), r.FormValue("guess"))
 	if err != nil {
 		writeError(w, err)
 		return
@@ -128,7 +132,7 @@ func (h *APIHandler) submit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) hint(w http.ResponseWriter, r *http.Request) {
-	if err := h.api.Hint(r.PathValue("id")); err != nil {
+	if err := h.api.Hint(r.PathValue("id"), sanitizeId(r.FormValue("player_id"))); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -136,7 +140,7 @@ func (h *APIHandler) hint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *APIHandler) resign(w http.ResponseWriter, r *http.Request) {
-	if err := h.api.Resign(r.PathValue("id")); err != nil {
+	if err := h.api.Resign(r.PathValue("id"), sanitizeId(r.FormValue("player_id"))); err != nil {
 		writeError(w, err)
 		return
 	}
@@ -233,13 +237,12 @@ func (h *APIHandler) setPlayer(w http.ResponseWriter, r *http.Request) {
 
 	name := api.SanitizeName(r.FormValue("name"))
 	if name == "" {
-		// Empty name resets to anonymous: remove the cookie
-		cleared := playerCookie(cookiePlayerName, "")
-		cleared.MaxAge = -1
-		http.SetCookie(w, cleared)
-	} else {
-		http.SetCookie(w, playerCookie(cookiePlayerName, url.QueryEscape(name)))
+		// Empty name resets the identity to a fresh generated name;
+		// keeping the cookie empty would resurrect the previous name
+		// from game history on the next play
+		name = api.GeneratePlayerName()
 	}
+	http.SetCookie(w, playerCookie(cookiePlayerName, url.QueryEscape(name)))
 
 	if r.Header.Get("HX-Request") == "true" {
 		// The starlark app renders the name everywhere; reload the page

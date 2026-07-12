@@ -70,7 +70,8 @@ def create_game(req):
 
 
 def fetch_game(req, game_id):
-    ret = http.get(API + "/api/game/" + game_id, error_on_fail=False)
+    ret = http.get(API + "/api/game/" + game_id,
+                   params={"player_id": get_cookie(req, "cb_pid")}, error_on_fail=False)
     if api_error(ret):
         return None
     data = common(req)
@@ -96,7 +97,7 @@ def game_action(req, action):
     game_id = req.UrlParams["game_id"]
     api_url = API + "/api/game/" + game_id + "/" + action
     guess = form_value(req, "guess")
-    body = {}
+    body = {"player_id": get_cookie(req, "cb_pid")}
     if action == "submit":
         body["guess"] = guess
     ret = http.post(api_url, form_body=body, error_on_fail=False)

@@ -16,9 +16,9 @@ func randSeq(n int) string {
 
 var nameLetters = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-// generatePlayerName makes an anonymous player name like PAAEE or PJJII:
+// GeneratePlayerName makes an anonymous player name like PAAEE or PJJII:
 // "P" followed by two random letters, each doubled.
-func generatePlayerName() string {
+func GeneratePlayerName() string {
 	a := nameLetters[rand.Intn(len(nameLetters))]
 	b := nameLetters[rand.Intn(len(nameLetters))]
 	return "P" + string([]rune{a, a, b, b})

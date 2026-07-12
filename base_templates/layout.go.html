@@ -163,7 +163,7 @@
       <h3 class="text-lg font-bold">Pick your name</h3>
       <p class="py-2 text-sm opacity-70">
         Shown to other players and saved on this device - no account needed.
-        Leave it empty and we'll give you a random one.
+        Save it empty to get a fresh random name.
       </p>
       {{/* posts straight to the Go API (proxied) which sets the cookies and
         asks htmx to reload the page
@@ -543,8 +543,10 @@
             spellcheck="false"
             enterkeyhint="go"
             class="input input-bordered input-lg flex-1 min-w-0 text-center font-mono uppercase tracking-[0.4em]"
-            _="on load call me.focus()" />
-          <button type="submit" class="btn btn-primary btn-lg">
+            _="on load call me.focus()
+               then set my.selectionStart to my.value.length
+               then set my.selectionEnd to my.value.length" />
+          <button type="submit" class="btn btn-primary btn-lg px-8">
             <span
               class="loading loading-spinner loading-xs htmx-indicator"></span>
             Go
