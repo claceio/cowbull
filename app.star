@@ -75,6 +75,7 @@ def fetch_game(req, game_id):
         return None
     data = common(req)
     data.update(ret.value.json())  # Game, Nudge, Pun
+    data["Prefill"] = ""
     data["GamePath"] = req.AppPath + "/game/" + data["Game"]["GameId"]
     challenge_id = data["Game"]["ChallengeId"]
     if challenge_id:
@@ -94,9 +95,10 @@ def game_handler(req):
 def game_action(req, action):
     game_id = req.UrlParams["game_id"]
     api_url = API + "/api/game/" + game_id + "/" + action
+    guess = form_value(req, "guess")
     body = {}
     if action == "submit":
-        body["guess"] = form_value(req, "guess")
+        body["guess"] = guess
     ret = http.post(api_url, form_body=body, error_on_fail=False)
     err = api_error(ret)
 
@@ -104,8 +106,17 @@ def game_action(req, action):
     if not data:
         return not_found(req, "That game does not exist. Check the id?")
     data["Error"] = err
-    if action == "submit" and not err and ret.value.json().get("Won"):
-        data["Won"] = True
+    if action == "submit":
+        if err:
+            # let the player fix the rejected word
+            data["Prefill"] = guess
+        else:
+            result = ret.value.json()
+            if result.get("Won"):
+                data["Won"] = True
+            elif result.get("Bulls", 0) >= 2 or result.get("Cows", 0) >= 3:
+                # strong guess: start the next turn from it
+                data["Prefill"] = guess
     return ace.response(data, "game_main")
 
 
@@ -136,6 +147,7 @@ def challenge_handler(req):
     data = fetch_challenge(req, req.UrlParams["challenge_id"])
     if not data:
         return not_found(req, "No game with that code. Check the id?")
+    data["ShowLoc"] = True
     if form_value(req, "done") == "1":
         data["Notice"] = "You have played all the rounds! Hang around for the final standings."
     return data
@@ -145,6 +157,7 @@ def board_handler(req):
     data = fetch_challenge(req, req.UrlParams["challenge_id"])
     if not data:
         return not_found(req, "No game with that code. Check the id?")
+    data["ShowLoc"] = form_value(req, "loc") == "1"
     return ace.response(data, "board_card")
 
 

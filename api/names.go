@@ -65,43 +65,34 @@ func firstName(name string) string {
 	return name
 }
 
-// displayName renders "Name (Location)" when the location is known.
-func displayName(name, location string) string {
-	n := firstName(name)
-	if location != "" && location != "Unknown" {
-		return n + " (" + location + ")"
-	}
-	return n
+func joinMessage(name string) string {
+	return fmt.Sprintf("%s joined the game!", firstName(name))
 }
 
-func joinMessage(name, location string) string {
-	return fmt.Sprintf("%s joined the game!", displayName(name, location))
-}
-
-func roundStartMessage(name, location string, round, numRounds int) string {
+func roundStartMessage(name string, round, numRounds int) string {
 	if numRounds > 1 {
-		return fmt.Sprintf("%s started round %d", displayName(name, location), round)
+		return fmt.Sprintf("%s started round %d", firstName(name), round)
 	}
-	return fmt.Sprintf("%s started playing", displayName(name, location))
+	return fmt.Sprintf("%s started playing", firstName(name))
 }
 
-func bigGuessMessage(name, location string, bulls, cows int) string {
+func bigGuessMessage(name string, bulls, cows int) string {
 	if bulls >= 2 {
-		return fmt.Sprintf("%s is closing in - %d bulls!", displayName(name, location), bulls)
+		return fmt.Sprintf("%s is closing in - %d bulls!", firstName(name), bulls)
 	}
-	return fmt.Sprintf("%s has %d cows - right letters, wrong spots!", displayName(name, location), cows)
+	return fmt.Sprintf("%s has %d cows - right letters, wrong spots!", firstName(name), cows)
 }
 
-func completedMessage(name, location string, round, numRounds int, score string) string {
+func completedMessage(name string, round, numRounds int, score string) string {
 	if numRounds > 1 {
-		return fmt.Sprintf("%s finished round %d with score %s. %s", displayName(name, location), round, score, RandomWinPun())
+		return fmt.Sprintf("%s finished round %d with score %s. %s", firstName(name), round, score, RandomWinPun())
 	}
-	return fmt.Sprintf("%s got the word - score %s. %s", displayName(name, location), score, RandomWinPun())
+	return fmt.Sprintf("%s got the word - score %s. %s", firstName(name), score, RandomWinPun())
 }
 
-func resignMessage(name, location string, round, numRounds int) string {
+func resignMessage(name string, round, numRounds int) string {
 	if numRounds > 1 {
-		return fmt.Sprintf("%s gave up on round %d", displayName(name, location), round)
+		return fmt.Sprintf("%s gave up on round %d", firstName(name), round)
 	}
-	return fmt.Sprintf("%s gave up", displayName(name, location))
+	return fmt.Sprintf("%s gave up", firstName(name))
 }

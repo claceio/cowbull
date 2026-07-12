@@ -88,7 +88,7 @@
 
     <div
       class="mt-6"
-      hx-get="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/board"
+      hx-get="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/board?loc=1"
       hx-trigger="sse:board"
       hx-target="this"
       hx-swap="innerHTML">
