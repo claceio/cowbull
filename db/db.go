@@ -33,13 +33,11 @@ type GameStatus struct {
 	GameId           string
 	Status           string
 	Location         string
-	StartedBy        string
 	Word             string
 	ChallengeId      string
 	CompletedSeconds int
 	CreateTime       *time.Time
 	StartTime        *time.Time
-	EndTime          *time.Time
 	Duration         sql.NullString
 	PlayerId         string
 	PlayerName       string
@@ -49,7 +47,6 @@ type GameStatus struct {
 type Challenge struct {
 	ChallengeId string
 	Word        string
-	CreateTime  *time.Time
 	Type        string
 	NumRounds   int
 	Title       string
@@ -68,10 +65,8 @@ type ClueCount struct {
 }
 
 type ChallengeEvent struct {
-	Id          int64
-	ChallengeId string
-	Message     string
-	EventTime   *time.Time
+	Message   string
+	EventTime *time.Time
 }
 
 func NewDB(dbFile string) *GameDB {
@@ -207,18 +202,16 @@ func (db *GameDB) GetChallengeWord(challengeId string, round int) (string, error
 
 func (db *GameDB) GetChallenge(challengeId string) (*Challenge, error) {
 	challengeId = strings.ToUpper(challengeId)
-	var startedBy, word, ctype, title string
+	var word, ctype, title string
 	var numRounds int
-	var createTime sql.NullString
-	err := db.db.QueryRow(`select started_by, word, create_time, challenge_type, num_rounds, title
+	err := db.db.QueryRow(`select word, challenge_type, num_rounds, title
 		from challenges where challenge_id = ?`, challengeId).
-		Scan(&startedBy, &word, &createTime, &ctype, &numRounds, &title)
+		Scan(&word, &ctype, &numRounds, &title)
 	if err != nil {
 		return nil, errors.New("invalid challenge id")
 	}
-	_ = startedBy
 
-	return &Challenge{challengeId, word, parseSqliteTime(createTime), ctype, numRounds, title}, nil
+	return &Challenge{challengeId, word, ctype, numRounds, title}, nil
 }
 
 func (db *GameDB) CreateGame(gameId, word, ipAddr, location, challengeId string, round int, playerId, playerName string) error {
@@ -228,22 +221,21 @@ func (db *GameDB) CreateGame(gameId, word, ipAddr, location, challengeId string,
 	return err
 }
 
-const gameColumns = `game_id, word, status, location, started_by, challenge_id, completed_seconds,
-	create_time, start_time, end_time, duration, player_id, player_name, round`
+const gameColumns = `game_id, word, status, location, challenge_id, completed_seconds,
+	create_time, start_time, duration, player_id, player_name, round`
 
 func scanGame(row interface{ Scan(...any) error }) (*GameStatus, error) {
 	var gs GameStatus
 	var duration sql.NullString
-	var createTime, startTime, endTime sql.NullString
-	err := row.Scan(&gs.GameId, &gs.Word, &gs.Status, &gs.Location, &gs.StartedBy, &gs.ChallengeId,
-		&gs.CompletedSeconds, &createTime, &startTime, &endTime, &duration,
+	var createTime, startTime sql.NullString
+	err := row.Scan(&gs.GameId, &gs.Word, &gs.Status, &gs.Location, &gs.ChallengeId,
+		&gs.CompletedSeconds, &createTime, &startTime, &duration,
 		&gs.PlayerId, &gs.PlayerName, &gs.Round)
 	if err != nil {
 		return nil, err
 	}
 	gs.CreateTime = parseSqliteTime(createTime)
 	gs.StartTime = parseSqliteTime(startTime)
-	gs.EndTime = parseSqliteTime(endTime)
 	gs.Duration = duration
 	return &gs, nil
 }
@@ -366,7 +358,7 @@ func (db *GameDB) InsertEvent(challengeId, message string) error {
 }
 
 func (db *GameDB) GetEvents(challengeId string, limit int) ([]ChallengeEvent, error) {
-	rows, err := db.db.Query(`select id, challenge_id, message, event_time from challenge_events
+	rows, err := db.db.Query(`select message, event_time from challenge_events
 		where challenge_id = ? order by id desc limit ?`, strings.ToUpper(challengeId), limit)
 	if err != nil {
 		return nil, err
@@ -377,7 +369,7 @@ func (db *GameDB) GetEvents(challengeId string, limit int) ([]ChallengeEvent, er
 	for rows.Next() {
 		var ev ChallengeEvent
 		var eventTime sql.NullString
-		if err := rows.Scan(&ev.Id, &ev.ChallengeId, &ev.Message, &eventTime); err != nil {
+		if err := rows.Scan(&ev.Message, &eventTime); err != nil {
 			return nil, err
 		}
 		ev.EventTime = parseSqliteTime(eventTime)

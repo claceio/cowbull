@@ -111,3 +111,41 @@ html[data-theme="cowbull-dark"] .cb-horn {
     fill: #fff;
   }
 }
+
+/* --- level picker: checked = light grey, not primary --- */
+input.level-pick:checked {
+  background-color: color-mix(in oklab, var(--color-base-content) 14%, var(--color-base-100));
+  border-color: color-mix(in oklab, var(--color-base-content) 10%, var(--color-base-100));
+  color: var(--color-base-content);
+  box-shadow: none;
+}
+
+/* --- single latest-activity flash on the game screen --- */
+.cb-flash {
+  position: fixed;
+  top: 4.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: none;
+  background: color-mix(in oklab, var(--color-base-content) 88%, transparent);
+  color: var(--color-base-100);
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+  max-width: 90vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- rounds slider + indicator: same light grey as the level picker --- */
+.range-grey {
+  color: color-mix(in oklab, var(--color-base-content) 30%, var(--color-base-100));
+}
+.badge-grey {
+  background-color: color-mix(in oklab, var(--color-base-content) 14%, var(--color-base-100));
+  border-color: color-mix(in oklab, var(--color-base-content) 10%, var(--color-base-100));
+  color: var(--color-base-content);
+}

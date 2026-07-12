@@ -135,20 +135,20 @@
 {{ define "level_picker" }}
   <div class="join w-full">
     <input
-      class="join-item btn flex-1"
+      class="join-item btn flex-1 level-pick"
       type="radio"
       name="level"
       value="Easy"
       aria-label="Easy" />
     <input
-      class="join-item btn flex-1"
+      class="join-item btn flex-1 level-pick"
       type="radio"
       name="level"
       value="Medium"
       aria-label="Medium"
       checked />
     <input
-      class="join-item btn flex-1"
+      class="join-item btn flex-1 level-pick"
       type="radio"
       name="level"
       value="Hard"
@@ -162,7 +162,7 @@
     <div class="modal-box">
       <h3 class="text-lg font-bold">Pick your name</h3>
       <p class="py-2 text-sm opacity-70">
-        Shown to other players and saved on this device — no account needed.
+        Shown to other players and saved on this device - no account needed.
         Leave it empty and we'll give you a random one.
       </p>
       {{/* posts straight to the Go API (proxied) which sets the cookies and
@@ -259,7 +259,8 @@
   <div
     class="alert alert-error text-sm shadow-lg"
     _="on load wait 6s then remove me">
-    {{ template "icon_alert" "w-4 h-4" }} {{ .Data.Message }}
+    {{ template "icon_alert" "w-4 h-4" }}
+    {{ .Data.Message }}
   </div>
 {{ end }}
 
@@ -282,10 +283,12 @@
   {{ $rounds := int $b.NumRounds }}
   <div class="card bg-base-100 shadow-sm">
     <div class="card-body p-5 md:p-6 space-y-2">
-      <h3 class="card-title text-base">{{ template "icon_medal" "w-5 h-5 text-primary" }} Standings</h3>
+      <h3 class="card-title text-base">
+        {{ template "icon_medal" "w-5 h-5 text-primary" }} Standings
+      </h3>
 
       {{ if not $b.Players }}
-        <p class="text-sm opacity-60">No games yet — be the first to play!</p>
+        <p class="text-sm opacity-60">No games yet - be the first to play!</p>
       {{ else if eq $rounds 1 }}
         <div class="overflow-x-auto">
           <table class="table table-sm">
@@ -306,7 +309,9 @@
                     bg-primary/10 font-semibold
                   {{ end }}">
                   <td>
-                    {{ if .IsLeader }}{{ template "icon_crown" "w-4 h-4 text-primary" }}{{ end }}
+                    {{ if .IsLeader }}
+                      {{ template "icon_crown" "w-4 h-4 text-primary" }}
+                    {{ end }}
                     {{ template "player_label" . }}
                   </td>
                   {{ if $r }}
@@ -323,7 +328,7 @@
                       {{ end }}
                     </td>
                   {{ else }}
-                    <td colspan="4" class="text-right opacity-50">—</td>
+                    <td colspan="4" class="text-right opacity-50">-</td>
                   {{ end }}
                 </tr>
               {{ end }}
@@ -350,12 +355,16 @@
                     bg-primary/10 font-semibold
                   {{ end }}">
                   <td>
-                    {{ if .IsLeader }}{{ template "icon_crown" "w-4 h-4 text-primary" }}{{ end }}
+                    {{ if .IsLeader }}
+                      {{ template "icon_crown" "w-4 h-4 text-primary" }}
+                    {{ end }}
                     {{ template "player_label" . }}
-                    <div class="text-xs opacity-60 font-normal whitespace-nowrap">
+                    <div
+                      class="text-xs opacity-60 font-normal whitespace-nowrap">
                       {{ int .CurGuesses }} guesses
                     </div>
-                    <div class="text-xs opacity-60 font-normal whitespace-nowrap">
+                    <div
+                      class="text-xs opacity-60 font-normal whitespace-nowrap">
                       {{ int .CurHints }} hints
                     </div>
                   </td>
@@ -381,7 +390,7 @@
                     {{ else if .DNF }}
                       <span
                         class="badge badge-ghost badge-sm"
-                        title="Stopped early — the total still counts"
+                        title="Stopped early - the total still counts"
                         >DNF</span
                       >
                     {{ else }}
@@ -400,7 +409,9 @@
       {{ end }}
 
       {{ if $b.Events }}
-        <h3 class="card-title text-base mt-3">{{ template "icon_megaphone" "w-5 h-5 text-primary" }} Activity</h3>
+        <h3 class="card-title text-base mt-3">
+          {{ template "icon_megaphone" "w-5 h-5 text-primary" }} Activity
+        </h3>
         <ul class="text-sm space-y-1 max-h-44 overflow-y-auto">
           {{ range $b.Events }}
             <li class="flex justify-between gap-3">
@@ -436,7 +447,9 @@
 
       {{ if eq $g.Status "COMPLETED" }}
         <div class="text-center py-2">
-          <div class="flex justify-center">{{ template "icon_trophy" "w-14 h-14 text-primary" }}</div>
+          <div class="flex justify-center">
+            {{ template "icon_trophy" "w-14 h-14 text-primary" }}
+          </div>
           <h2 class="text-2xl font-black mt-1">{{ .Data.Pun }}</h2>
           {{ if $g.Word }}
             <p class="mt-2">
@@ -462,7 +475,8 @@
                 <div class="stat-title text-xs">Guesses</div>
                 <div class="stat-value text-3xl">{{ int $g.GuessCount }}</div>
                 <div class="stat-desc">
-                  {{ int $g.HintCount }} hints · {{ $g.Time }}
+                  {{ int $g.HintCount }} hints ·
+                  {{ $g.Time }}
                 </div>
               </div>
             </div>
@@ -483,7 +497,9 @@
         </div>
       {{ else if eq $g.Status "RESIGNED" }}
         <div class="text-center py-2">
-          <div class="flex justify-center">{{ template "icon_flag" "w-14 h-14 opacity-60" }}</div>
+          <div class="flex justify-center">
+            {{ template "icon_flag" "w-14 h-14 opacity-60" }}
+          </div>
           <h2 class="text-xl font-black mt-1">The word won this time</h2>
           {{ if $g.Word }}
             <p class="mt-2">
@@ -563,6 +579,7 @@
         </div>
       {{ end }}
 
+
       <!-- Guess history -->
       <div>
         <div class="overflow-x-auto">
@@ -571,10 +588,12 @@
               <tr class="border-base-200">
                 <th class="font-medium">Word</th>
                 <th class="font-medium">
-                  Bulls {{ template "icon_bull" "w-3.5 h-3.5" }}
+                  Bulls
+                  {{ template "icon_bull" "w-3.5 h-3.5" }}
                 </th>
                 <th class="font-medium">
-                  Cows {{ template "icon_cow" "w-4 h-4" }}
+                  Cows
+                  {{ template "icon_cow" "w-4 h-4" }}
                 </th>
               </tr>
             </thead>
@@ -645,6 +664,8 @@
       >{{ template "icon_medal" "w-4 h-4" }} Standings</a
     >
   {{ else }}
-    <a href="{{ .AppPath }}/" class="btn btn-secondary btn-sm">{{ template "icon_home" "w-4 h-4" }} Home</a>
+    <a href="{{ .AppPath }}/" class="btn btn-secondary btn-sm"
+      >{{ template "icon_home" "w-4 h-4" }} Home</a
+    >
   {{ end }}
 {{ end }}

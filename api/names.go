@@ -6,16 +6,8 @@ import (
 	"strings"
 )
 
-var funNames = []string{
-	"Moolan", "Sir Loin", "Moozart", "Cowabunga Kid", "Bullseye Betty",
-	"Milkshake Mike", "Moo-dini", "Anggus", "Buttercup", "Cowpernicus",
-	"Bullwinkle", "Moo-riarty", "Legendairy Larry", "Heifer Potter",
-	"Disco Bull", "Turbo Heifer", "Ninja Calf", "Moo-nica", "Calf Vader",
-	"Cud-dles", "Moosette", "El Toro", "Daisy Duke", "Ferdinand",
-}
-
 var winPuns = []string{
-	"Nailed it!", "Great solve!", "Sharp guessing!", "That was quick!",
+	"Nailed it!", "Great solve!", "Sharp guessing!",
 	"Impressive!", "Word wizardry!", "Holy cow!", "Smooth work!",
 	"Right on target!", "Clean finish!",
 }
@@ -24,14 +16,10 @@ var nudgePuns = []string{
 	"Vowels first is never a bad idea.",
 	"Every guess narrows it down.",
 	"Four unique letters, no repeats.",
-	"Bulls don't lie — trust the positions.",
+	"Bulls don't lie - trust the positions.",
 	"A miss still rules letters out.",
 	"Try covering new letters each guess.",
 	"Watch for letters that keep scoring.",
-}
-
-func RandomFunName() string {
-	return funNames[rand.Intn(len(funNames))]
 }
 
 func RandomWinPun() string {
@@ -98,17 +86,17 @@ func roundStartMessage(name, location string, round, numRounds int) string {
 }
 
 func bigGuessMessage(name, location string, bulls, cows int) string {
-	if bulls >= 3 {
-		return fmt.Sprintf("%s is closing in — %d bulls!", displayName(name, location), bulls)
+	if bulls >= 2 {
+		return fmt.Sprintf("%s is closing in - %d bulls!", displayName(name, location), bulls)
 	}
-	return fmt.Sprintf("%s found all the letters, wrong spots — %d cows!", displayName(name, location), cows)
+	return fmt.Sprintf("%s has %d cows - right letters, wrong spots!", displayName(name, location), cows)
 }
 
 func completedMessage(name, location string, round, numRounds int, score string) string {
 	if numRounds > 1 {
 		return fmt.Sprintf("%s finished round %d with score %s. %s", displayName(name, location), round, score, RandomWinPun())
 	}
-	return fmt.Sprintf("%s got the word — score %s. %s", displayName(name, location), score, RandomWinPun())
+	return fmt.Sprintf("%s got the word - score %s. %s", displayName(name, location), score, RandomWinPun())
 }
 
 func resignMessage(name, location string, round, numRounds int) string {

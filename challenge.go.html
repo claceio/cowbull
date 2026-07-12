@@ -1,99 +1,100 @@
 {{ define "content" }}
 
-      {{ $b := .Data.Board }}
-      {{ $rounds := int $b.NumRounds }}
-      <div
-        hx-ext="sse"
-        sse-connect="{{ .AppPath }}/api/challenge/{{ $b.ChallengeId }}/events">
-        <div
-          class="hidden"
-          sse-swap="activity"
-          hx-target="#toasts"
-          hx-swap="afterbegin"></div>
+  {{ $b := .Data.Board }}
+  {{ $rounds := int $b.NumRounds }}
+  <div
+    hx-ext="sse"
+    sse-connect="{{ .AppPath }}/api/challenge/{{ $b.ChallengeId }}/events">
+    <div
+      class="hidden"
+      sse-swap="activity"
+      hx-target="#toasts"
+      hx-swap="afterbegin"></div>
 
-        <div class="card bg-base-100 shadow-sm">
-          <div class="card-body p-5 md:p-7 text-center space-y-3">
-            {{ if $b.Title }}
-              <h2 class="text-xl font-black">{{ $b.Title }}</h2>
-              <p class="text-sm opacity-70 -mt-1">
-                {{ if gt $rounds 1 }}
-                  {{ template "icon_trophy" "w-4 h-4" }} Tournament · {{ $rounds }} rounds · same words for
-                  everyone, every round adds to your total, highest total
-                  wins.
-                {{ else }}
-                  One hidden word, best score wins.
-                {{ end }}
-              </p>
-            {{ else if gt $rounds 1 }}
-              <h2 class="text-lg font-bold">
-                {{ template "icon_trophy" "w-5 h-5 text-primary" }} Tournament ·
-                {{ $rounds }} rounds
-              </h2>
-              <p class="text-sm opacity-70 -mt-1">
-                Same {{ $rounds }} words for everyone. Every round adds to
-                your running total — highest total wins.
-              </p>
+    <div class="card bg-base-100 shadow-sm">
+      <div class="card-body p-5 md:p-7 text-center space-y-3">
+        {{ if $b.Title }}
+          <h2 class="text-xl font-black">{{ $b.Title }}</h2>
+          <p class="text-sm opacity-70 -mt-1">
+            {{ if gt $rounds 1 }}
+              {{ template "icon_trophy" "w-4 h-4" }} Tournament · {{ $rounds }}
+              rounds · same words for everyone, every round adds to your total,
+              highest total wins.
             {{ else }}
-              <h2 class="text-lg font-bold">{{ template "icon_swords" "w-5 h-5 text-primary" }} Friendly match</h2>
-              <p class="text-sm opacity-70 -mt-1">
-                One hidden word, best score wins.
-              </p>
+              One hidden word, best score wins.
             {{ end }}
+          </p>
+        {{ else if gt $rounds 1 }}
+          <h2 class="text-lg font-bold">
+            {{ template "icon_trophy" "w-5 h-5 text-primary" }} Tournament ·
+            {{ $rounds }} rounds
+          </h2>
+          <p class="text-sm opacity-70 -mt-1">
+            Same {{ $rounds }} words for everyone. Every round adds to your
+            running total - highest total wins.
+          </p>
+        {{ else }}
+          <h2 class="text-lg font-bold">
+            {{ template "icon_swords" "w-5 h-5 text-primary" }} Friendly match
+          </h2>
+          <p class="text-sm opacity-70 -mt-1">
+            One hidden word, best score wins.
+          </p>
+        {{ end }}
 
 
-            <div class="mt-3 flex items-center justify-center gap-2">
-              <span
-                class="font-mono text-4xl font-black tracking-[0.3em] bg-base-200 rounded-xl px-4 py-2"
-                >{{ $b.ChallengeId }}</span
-              >
-              <button
-                class="btn btn-outline"
-                data-url="{{ .Data.ShareURL }}"
-                aria-label="Copy invite link"
-                _="on click call navigator.clipboard.writeText(@data-url)
+        <div class="mt-3 flex items-center justify-center gap-2">
+          <span
+            class="font-mono text-4xl font-black tracking-[0.3em] bg-base-200 rounded-xl px-4 py-2"
+            >{{ $b.ChallengeId }}</span
+          >
+          <button
+            class="btn btn-outline"
+            data-url="{{ .Data.ShareURL }}"
+            aria-label="Copy invite link"
+            _="on click call navigator.clipboard.writeText(@data-url)
                    then add .hidden to the first <span/> in me
                    then remove .hidden from the last <span/> in me
                    then wait 2s
                    then remove .hidden from the first <span/> in me
                    then add .hidden to the last <span/> in me">
-                <span>{{ template "icon_link" "w-5 h-5" }}</span>
-                <span class="hidden text-success"
-                  >{{ template "icon_check" "w-5 h-5" }}</span
-                >
-              </button>
-            </div>
-            <p class="text-xs opacity-60">
-              Send the code or copy the invite link
-            </p>
+            <span>{{ template "icon_link" "w-5 h-5" }}</span>
+            <span class="hidden text-success"
+              >{{ template "icon_check" "w-5 h-5" }}</span
+            >
+          </button>
+        </div>
+        <p class="text-xs opacity-60">Send the code or copy the invite link</p>
 
-            {{ if .Data.Notice }}
-              <div role="alert" class="alert alert-info py-2 text-sm">
-                <span>{{ template "icon_sparkles" "w-4 h-4" }} {{ .Data.Notice }}</span>
-              </div>
-            {{ end }}
-
-
-            <form
-              action="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/play"
-              method="post">
-              <button type="submit" class="btn btn-primary btn-lg btn-block mt-3">
-                {{ template "icon_play" "w-5 h-5" }} Play
-                {{ if gt $rounds 1 }}next round{{ end }}
-              </button>
-            </form>
-
+        {{ if .Data.Notice }}
+          <div role="alert" class="alert alert-info py-2 text-sm">
+            <span
+              >{{ template "icon_sparkles" "w-4 h-4" }} {{ .Data.Notice }}</span
+            >
           </div>
-        </div>
+        {{ end }}
 
-        <div
-          class="mt-6"
-          hx-get="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/board"
-          hx-trigger="sse:board"
-          hx-target="this"
-          hx-swap="innerHTML">
-          {{ template "board_card" . }}
-        </div>
+
+        <form
+          action="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/play"
+          method="post">
+          <button type="submit" class="btn btn-primary btn-lg btn-block mt-3">
+            {{ template "icon_play" "w-5 h-5" }} Play
+            {{ if gt $rounds 1 }}next round{{ end }}
+          </button>
+        </form>
       </div>
+    </div>
+
+    <div
+      class="mt-6"
+      hx-get="{{ .AppPath }}/challenge/{{ $b.ChallengeId }}/board"
+      hx-trigger="sse:board"
+      hx-target="this"
+      hx-swap="innerHTML">
+      {{ template "board_card" . }}
+    </div>
+  </div>
 {{ end }}
 
 {{ template "page" . }}
