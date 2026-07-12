@@ -193,3 +193,8 @@ h3,
 .cb-wordmark {
   letter-spacing: 0.01em;
 }
+
+/* --- slightly larger paragraph text --- */
+p {
+  font-size: 1.08em;
+}

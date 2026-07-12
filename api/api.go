@@ -221,6 +221,9 @@ func (g *GameAPI) getChallengeWord(challengeId string, round int) (string, error
 // StartChallengeGame starts (or resumes) the player's next round and
 // returns the game id to play.
 func (g *GameAPI) StartChallengeGame(challengeId, ipAddr, playerId, playerName string) (string, error) {
+	if playerId == "" {
+		return "", errors.New("player id required")
+	}
 	challengeId = strings.ToUpper(challengeId)
 	challenge, err := g.db.GetChallenge(challengeId)
 	if err != nil {
@@ -231,7 +234,7 @@ func (g *GameAPI) StartChallengeGame(challengeId, ipAddr, playerId, playerName s
 	if playerName == "" {
 		playerName = g.db.LastPlayerName(playerId)
 		if playerName == "" {
-			playerName = generatePlayerName()
+			playerName = GeneratePlayerName()
 		}
 	}
 
@@ -266,8 +269,11 @@ func (g *GameAPI) StartChallengeGame(challengeId, ipAddr, playerId, playerName s
 	return gameId, nil
 }
 
-func (g *GameAPI) StartGame(ipAddr, level, playerId, playerName string) string {
-	return g.createGame(g.getWord(level), ipAddr, g.getLocation(ipAddr), "", 1, playerId, playerName)
+func (g *GameAPI) StartGame(ipAddr, level, playerId, playerName string) (string, error) {
+	if playerId == "" {
+		return "", errors.New("player id required")
+	}
+	return g.createGame(g.getWord(level), ipAddr, g.getLocation(ipAddr), "", 1, playerId, playerName), nil
 }
 
 // GameView is the game state exposed to the UI. The hidden word is only set
@@ -288,9 +294,12 @@ type GameView struct {
 	CreatedAgo     string
 }
 
-func (g *GameAPI) GetGame(gameId string) (*GameView, error) {
+func (g *GameAPI) GetGame(gameId, playerId string) (*GameView, error) {
 	gs, err := g.db.CheckGameId(gameId)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkOwner(gs, playerId, true); err != nil {
 		return nil, err
 	}
 	clues, err := g.db.GetClues(gs.GameId)
@@ -353,15 +362,32 @@ func (g *GameAPI) setStatus(gameId, status string, startTime *time.Time) {
 	}
 }
 
+// checkOwner rejects requests for games that belong to another player.
+// Challenge games are fully private (their clues would leak the shared
+// word); solo games are readable by anyone via the share link but only
+// playable by their owner.
+func checkOwner(gs *gamedb.GameStatus, playerId string, readOnly bool) error {
+	if playerId != "" && gs.PlayerId == playerId {
+		return nil
+	}
+	if readOnly && gs.ChallengeId == "" {
+		return nil
+	}
+	return errors.New("this game belongs to another player")
+}
+
 // SubmitResult is returned from a guess submission.
 type SubmitResult struct {
 	Bulls, Cows int
 	Won         bool
 }
 
-func (g *GameAPI) Submit(gameId, clue string) (*SubmitResult, error) {
+func (g *GameAPI) Submit(gameId, playerId, clue string) (*SubmitResult, error) {
 	gameStatus, err := g.db.CheckGameId(gameId)
 	if err != nil {
+		return nil, err
+	}
+	if err := checkOwner(gameStatus, playerId, false); err != nil {
 		return nil, err
 	}
 	if gameStatus.Status != "STARTED" && gameStatus.Status != "CREATED" {
@@ -417,9 +443,12 @@ func (g *GameAPI) notifyGuess(gs *gamedb.GameStatus, bulls, cows int, won bool) 
 	}
 }
 
-func (g *GameAPI) Hint(gameId string) error {
+func (g *GameAPI) Hint(gameId, playerId string) error {
 	gameStatus, err := g.db.CheckGameId(gameId)
 	if err != nil {
+		return err
+	}
+	if err := checkOwner(gameStatus, playerId, false); err != nil {
 		return err
 	}
 	if gameStatus.Status != "STARTED" && gameStatus.Status != "CREATED" {
@@ -476,9 +505,12 @@ func (g *GameAPI) getHint(status *gamedb.GameStatus, clues []gamedb.GameClue) (s
 	return "", errors.New("no suitable hint found")
 }
 
-func (g *GameAPI) Resign(gameId string) error {
+func (g *GameAPI) Resign(gameId, playerId string) error {
 	gameStatus, err := g.db.CheckGameId(gameId)
 	if err != nil {
+		return err
+	}
+	if err := checkOwner(gameStatus, playerId, false); err != nil {
 		return err
 	}
 	if gameStatus.Status != "CREATED" && gameStatus.Status != "STARTED" {
@@ -509,7 +541,7 @@ type RoundResult struct {
 
 // PlayerRow is one player's aggregate standing in a challenge.
 type PlayerRow struct {
-	PlayerId   string
+	PlayerId   string `json:"-"` // internal grouping key, never exposed
 	Name       string
 	Location   string
 	Rounds     []*RoundResult // indexed by round-1, nil if not played
@@ -553,11 +585,7 @@ func (g *GameAPI) GetBoard(challengeId string) (*Board, error) {
 	for _, gs := range games {
 		pid, name := gs.PlayerId, gs.PlayerName
 		if pid == "" {
-			// Games from before player identity existed
-			pid = gs.GameId
-			if name == "" {
-				name = "Guest"
-			}
+			continue // pre-identity games, aged out by cleanup
 		}
 		row, ok := players[pid]
 		if !ok {
