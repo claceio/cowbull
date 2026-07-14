@@ -33,7 +33,8 @@ WORKDIR /app
 
 COPY --from=builder /app/${APP_NAME} .
 
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup && \
+RUN apk add --no-cache sqlite && \
+    addgroup -S appgroup && adduser -S appuser -G appgroup && \
     mkdir /app/data && chown -R appuser:appgroup /app
 
 USER appuser
