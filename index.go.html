@@ -17,7 +17,7 @@
           {{ template "icon_bull" "w-5 h-5 text-primary" }} Solo game
         </h2>
         <p class="text-sm opacity-70 -mt-1">
-          Just you and the word. Fewer guesses, better score.
+          Just you and the word. Beat your high score.
         </p>
         <form action="{{ .AppPath }}/game" method="post" class="mt-3 space-y-4">
           {{ template "level_picker" . }}
@@ -35,7 +35,7 @@
           {{ template "icon_users" "w-5 h-5 text-primary" }} Play with friends
         </h2>
         <p class="text-sm opacity-70 -mt-1">
-          Everyone gets the same words - share the code, highest total wins.
+          Share the game link with others, everyone gets the same hidden words.
         </p>
         <form
           action="{{ .AppPath }}/challenge"
@@ -58,7 +58,7 @@
               <span class="badge badge-grey" id="rounds-val">3</span>
             </div>
             <p class="text-xs opacity-60 mt-1">
-              1 round is a quick match. Every round adds to your total - highest
+              Play multiple rounds, every round adds to your total - highest
               total wins.
             </p>
           </div>
