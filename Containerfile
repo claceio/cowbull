@@ -40,8 +40,6 @@ RUN apk add --no-cache sqlite && \
 USER appuser
 
 # The sqlite database lives on a named volume so games survive rebuilds
-# Commented out so that the sqlite binding can be use to create thie volume
-# --bind "sqlite/main;path=/app/data"
-# VOLUME /app/data
+VOLUME /app/data
 
 ENTRYPOINT /app/${APP_NAME} -f /app/data/db.sqlite -l /app/data/GeoLite2-City.mmdb ${APP_ARGS}
