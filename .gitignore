@@ -1,5 +1,6 @@
 db.sqlite
 db.sqlite-*
 cowbull
+GeoLite2-City.mmdb
 *.swp
 *.swo
